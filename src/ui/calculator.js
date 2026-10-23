@@ -18,7 +18,7 @@
   var Editor = FX.Editor;
   var Keys = FX.Keys;
 
-  var MODES = { 1: 'COMP', 2: 'CMPLX', 3: 'EQN' }; // MODE menu digit -> implemented mode
+  var MODES = { 1: 'COMP', 2: 'CMPLX', 3: 'STAT', 5: 'EQN', 7: 'TABLE' }; // MODE menu digit -> mode (numbers kept as on the fx-570ES PLUS; 4, 6, 8 are not offered and ignored)
   var HYP_FNS = ['sinh(', 'cosh(', 'tanh(', 'sinh⁻¹(', 'cosh⁻¹(', 'tanh⁻¹('];
   var CMPLX_MENU_ATOMS = ['arg(', 'Conjg(', '▶r∠θ', '▶a+bi'];
   var HISTORY_BYTES = 200;
@@ -26,7 +26,8 @@
   // atoms that, typed right after a result, start the new expression with "Ans"
   var ANS_PREFIX_ATOMS = { '+': 1, '−': 1, '×': 1, '÷': 1, '²': 1, '³': 1, '⁻¹': 1, '!': 1, '%': 1,
     'nPr': 1, 'nCr': 1, 'drgD': 1, 'drgR': 1, 'drgG': 1, '^(': 1, 'ˣ√(': 1, '⌟': 1,
-    '∠': 1, '▶r∠θ': 1, '▶a+bi': 1 };   // CMPLX: binary ∠ and the result-format commands also take Ans
+    '∠': 1, '▶r∠θ': 1, '▶a+bi': 1,
+    'sp:xhat': 1, 'sp:xhat1': 1, 'sp:xhat2': 1, 'sp:yhat': 1, 'sp:tnorm': 1 };   // STAT estimate commands   // CMPLX: binary ∠ and the result-format commands also take Ans
   var ANS_PREFIX_TPL = { pow: 1, frac: 1, nroot: 1 };
 
   function defaultSettings() {
@@ -47,6 +48,7 @@
     this.listeners = [];
     this.memory = null;
     this.settings = defaultSettings();
+    this._statIoBack = null;    // display format before MODE 3 (restored when leaving STAT)
     this.reset(true);
   }
 
@@ -72,7 +74,9 @@
     this.dispFlag = false;      // Disp indicator
     this.prevScreen = null;
     this.lastKey = null;
-    this.eqn = null;            // EQN (MODE 3) session, see "EQN" section below
+    this.eqn = null;            // EQN (MODE 5) session, see "EQN" section below
+    this.stat = null;           // STAT (MODE 3) session, see src/ui/stat.js
+    this.table = null;          // TABLE (MODE 7) session, see src/ui/table.js
   };
 
   /* ---------------- events ---------------- */
@@ -127,7 +131,9 @@
       insertMode: this.ed.overwrite ? 'overwrite' : (this.ed.insWrap ? 'insWrap' : 'insert'),
       cursor: { path: this.ed.cur.path.map(function (p) { return p.slice(); }), pos: this.ed.cur.pos },
       historyLength: this.history.length,
-      eqn: this.screen === 'eqn' || (this.screen === 'error' && this.eqn) ? this._eqnState() : null
+      eqn: this.screen === 'eqn' || (this.screen === 'error' && this.eqn) ? this._eqnState() : null,
+      stat: this.settings.mode === 'STAT' && this.stat ? this._statState() : null,
+      table: this.settings.mode === 'TABLE' && this.table ? this._tableState() : null
     };
   };
 
@@ -141,7 +147,7 @@
       M: !A.isZero(this.memory.M),
       STO: mod === 'sto',
       RCL: mod === 'rcl',
-      STAT: s.mode === 'STAT', CMPLX: s.mode === 'CMPLX', MAT: s.mode === 'MATRIX', VCT: s.mode === 'VECTOR',
+      STAT: s.mode === 'STAT', CMPLX: s.mode === 'CMPLX',
       D: s.angle === 'deg', R: s.angle === 'rad', G: s.angle === 'gra',
       FIX: s.format.type === 'fix', SCI: s.format.type === 'sci',
       Math: s.io !== 'LineIO',
@@ -168,6 +174,8 @@
       ind.up = this.eqn.solIdx > 0;
       ind.down = this.eqn.solIdx < this.eqn.sols.length - 1;
     }
+    if (this.screen === 'stat' && this.stat) this._statIndicators(ind);
+    if (this.screen === 'table' && this.table) this._tableIndicators(ind);
     if (!this.power) for (var k in ind) ind[k] = false;
     return ind;
   };
@@ -181,6 +189,7 @@
     if (id.indexOf('const:') === 0) return FX.Tables ? FX.Tables.constSymbol(id.slice(6)) : id;
     if (id.indexOf('conv:') === 0) return FX.Tables ? FX.Tables.convLabel(id.slice(5)) : id;
     if (id.indexOf('lbl:') === 0) return id.slice(4);
+    if (/^(st|sp|sf):/.test(id) && FX.StatLabels) return FX.StatLabels.text(id);
     return id;
   }
   function rowText(row) {
@@ -315,6 +324,8 @@
       case 'error': this._errorKey(name, action); break;
       case 'message': this._messageKey(name, action); break;
       case 'eqn': this._eqnKey(name, action); break;
+      case 'stat': this._statKey(name, action); break;
+      case 'table': this._tableKey(name, action); break;
       default: this._editKey(name, action);
     }
     this._emit();
@@ -365,12 +376,15 @@
   Calculator.prototype.powerOn = function () {
     var mem = this.memory;
     var settings = this.settings;
+    var tableFx = this.table ? this.table.fx : null;   // f(X) kept over OFF/ON [미확인]
     this.reset(false);
     this.memory = mem;
     this.settings = settings;
     this.ed.lineMode = settings.io === 'LineIO';
     // ON in EQN: coefficients are not kept, the equation type menu comes back [미확인]
     if (settings.mode === 'EQN') this._eqnEnter();
+    if (settings.mode === 'STAT') this._statEnter(null);
+    if (settings.mode === 'TABLE') this._tableEnter(tableFx);
   };
 
   Calculator.prototype.powerOff = function () {
@@ -496,6 +510,7 @@
         this._openMenu('cmplx');
         return;
     }
+    if (action === 'modeOnly:STAT') { if (this.settings.mode === 'STAT' && this.stat && this.stat.sub === 'calc') this._statMenuOpen(); return; }
     if (action.indexOf('modeOnly:') === 0) return; // SHIFT 1~5 menus: other modes only
   };
 
@@ -503,6 +518,8 @@
 
   Calculator.prototype._insert = function (action, inResult) {
     if (this.screen === 'eqn') { this._eqnInsert(action); return; }   // EQN coefficient cell
+    if (this.screen === 'stat') { this._statInsert(action); return; }  // STAT data cell
+    if (this.screen === 'table') { this._tableInsert(action); return; }  // TABLE f(X) / Start / End / Step
     var kind = action.slice(0, 2);
     var id = action.slice(2);
     if (kind === 'v:') { kind = 'a:'; }
@@ -578,7 +595,9 @@
     var A = FX.Adapter;
     var comp = A.compile(row, this.engineSettings());
     if (comp.error) return { ok: false, error: comp.error, errorPos: null, srcMap: comp.srcMap };
-    var r = A.run(comp.tokens, this.engineSettings(extra), memOverride || this.memory);
+    var memUse = memOverride || this.memory;
+    if (this.settings.mode === 'STAT' && this.stat) memUse.stat = this._statAnalysis();
+    var r = A.run(comp.tokens, this.engineSettings(extra), memUse);
     r.srcMap = comp.srcMap;
     r.tokens = comp.tokens;
     return r;
@@ -699,6 +718,8 @@
 
   Calculator.prototype._errorKey = function (name, action) {
     if (this.error && this.error.eqn && this._inEqn()) { this._eqnErrorKey(action); return; }
+    if (this.error && this.error.stat && this.stat) { this._statErrorKey(action); return; }
+    if (this.error && this.error.table && this._inTable()) { this._tableErrorKey(action); return; }
     if (action === 'ac') {
       this.error = null;
       this.ed.clear();
@@ -883,7 +904,7 @@
 
   /* ---------------- menus ---------------- */
   var MENUS = {
-    mode: { pages: [['1:COMP', '2:CMPLX', '3:EQN']] }, // only implemented modes, numbered consecutively (differs from the real fx-570ES)
+    mode: { pages: [['1:COMP', '2:CMPLX', '3:STAT', '5:EQN', '7:TABLE']] },   // one page (3 lines); 4/6/8 removed
     setup: { pages: [
       ['1:MthIO', '2:LineIO', '3:Deg', '4:Rad', '5:Gra', '6:Fix', '7:Sci', '8:Norm'],
       ['1:ab/c', '2:d/c', '3:CMPLX', '4:STAT', '5:Disp', '6:◀CONT▶']
@@ -906,7 +927,7 @@
 
   Calculator.prototype._openMenu = function (id, extra) {
     if (!this.menu || this.screen !== 'menu') this.prevScreen = { screen: this.screen };
-    var def = MENUS[id];
+    var def = (extra && extra.itemPages) ? { pages: extra.itemPages } : MENUS[id];
     this.menu = { id: id, page: 0, pages: def.pages.length };
     if (extra) for (var k in extra) this.menu[k] = extra[k];
     this.screen = 'menu';
@@ -914,6 +935,18 @@
 
   Calculator.prototype._closeMenu = function (toBlank) {
     this.menu = null;
+    if (this.settings.mode === 'STAT' && this.stat && this.prevScreen && this.prevScreen.screen === 'stat') {
+      // menus opened from the STAT type menu / data editor (MODE, SETUP, SHIFT 1) come back to it
+      this.screen = 'stat';
+      if (toBlank) this._statAfterSetup();
+      return;
+    }
+    if (this._inTable() && this.prevScreen && this.prevScreen.screen === 'table') {
+      // menus opened from a TABLE screen (MODE, SETUP, hyp, DRG, CLR) come back to it
+      this.screen = 'table';
+      if (toBlank) this._tableAfterSetup();
+      return;
+    }
     if (this._inEqn() && this.prevScreen && this.prevScreen.screen === 'eqn') {
       // menus opened from an EQN screen (MODE, SETUP, hyp, DRG, CLR) come back to it
       this.screen = 'eqn';
@@ -942,26 +975,61 @@
     if (action === 'off') { this.menu = null; this.powerOff(); return; }
     if (name === '▼' && m.page < m.pages - 1) { m.page++; return; }
     if (name === '▲' && m.page > 0) { m.page--; return; }
+    if (m.id.indexOf('stm:') === 0) { this._statMenuKey(name, action, d); return; }
 
     var s = this.settings;
     switch (m.id) {
       case 'mode':
-        if (d >= 1 && d <= 3) {
+        if (d !== null && MODES[d]) {
           var mode = MODES[d];
           // mode change clears the calculation history; Ans, variables and M are kept
-          var wasEqn = s.mode === 'EQN';
+          var wasEqn = s.mode === 'EQN', wasStat = s.mode === 'STAT';
           s.mode = mode;
           this.history = []; this.histIdx = -1;
           this.lastExpr = null; this.shownExpr = null;
+          // STAT forces linear display (manual 12쪽 주의: "STAT, BASE-N, MATRIX 또는 VECTOR 모드를 입력할 때마다
+          // 계산기가 리니어 표기를 자동으로 변환"). Restoring the previous display format when leaving STAT is
+          // not stated in the manual [미확인]; the previous format is restored (simplest choice).
+          if (mode === 'STAT' && !wasStat) {
+            this._statIoBack = s.io;
+            this._setIO('LineIO');
+          } else if (mode !== 'STAT' && wasStat) {
+            if (this._statIoBack) this._setIO(this._statIoBack);
+            this._statIoBack = null;
+          }
           if (mode === 'EQN') {
-            // MODE 3: equation type menu (also from inside EQN = change of type, spec Part A)
+            // MODE 5: equation type menu (also from inside EQN = change of type, spec Part A)
             this.menu = null;
             this.ed.clear();
             this._toInput();
+            this.stat = null;
+            this.table = null;
             this._eqnEnter(wasEqn ? this.eqn : null);
             return;
           }
+          if (mode === 'STAT') {
+            // MODE 3: statistics type menu (src/ui/stat.js)
+            this.menu = null;
+            this.ed.clear();
+            this._toInput();
+            this.eqn = null;
+            this.table = null;
+            this._statEnter(wasStat ? this.stat : null);
+            return;
+          }
+          if (mode === 'TABLE') {
+            // MODE 7: f(X)= entry (src/ui/table.js). A mode change deletes f(X) (manual 63쪽), also MODE 7 in TABLE
+            this.menu = null;
+            this.ed.clear();
+            this._toInput();
+            this.eqn = null;
+            this.stat = null;
+            this._tableEnter(null);
+            return;
+          }
           this.eqn = null;
+          this.table = null;
+          this.stat = null;       // leaving STAT deletes the statistics data
           this._closeMenu(true);
         }
         return;
@@ -1029,8 +1097,11 @@
           if (what === 1 || what === 3) {
             var c = this.settings.contrast;
             this.eqn = null;            // Reset Setup returns to COMP
+            this.stat = null;
+            this.table = null;
             this.settings = defaultSettings();
             this.settings.contrast = c;
+            this._statIoBack = null;
             this.ed.lineMode = false; this.ed.overwrite = false;
             this.history = []; this.histIdx = -1;
           }
@@ -1047,7 +1118,7 @@
   Calculator.prototype.menuLines = function () {
     var m = this.menu;
     if (!m) return [];
-    var def = MENUS[m.id];
+    var def = m.itemPages ? { pages: m.itemPages, title: m.title } : MENUS[m.id];
     if (m.id === 'contrast') return ['CONTRAST', '', 'LIGHT        DARK', ' [◀]          [▶]'];
     if (m.id === 'clrConfirm') {
       var q = m.what === 1 ? 'Reset Setup?' : m.what === 2 ? 'Clear Memory?' : 'Reset All?';
@@ -1083,7 +1154,7 @@
     }
     if (action === 'ac' || action === 'exe') {
       this.message = null;
-      this.screen = this._inEqn() ? 'eqn' : 'input';
+      this.screen = this._inEqn() ? 'eqn' : this._inTable() ? 'table' : (this.settings.mode === 'STAT' && this.stat && this.stat.sub !== 'calc' ? 'stat' : 'input');
       if (this.screen === 'eqn') this._eqnAfterSetup();
       return;
     }
@@ -1272,6 +1343,7 @@
   Calculator.prototype._backScreen = function () {
     var prev = this.prevScreen ? this.prevScreen.screen : 'input';
     if (prev === 'eqn' && this._inEqn()) return 'eqn';
+    if (prev === 'table' && this._inTable()) return 'table';
     return prev === 'result' && this.res ? 'result' : 'input';
   };
 
@@ -1613,6 +1685,8 @@
       case 'message': return this.message && this.message.lines ? this.message.lines.slice() : [];
       case 'error': return [this.error.message, '', '[AC] :Cancel', '[◀][▶]:Goto'];
       case 'eqn': return this._eqnLines();
+      case 'stat': return this._statLines();
+      case 'table': return this._tableLines();
       case 'prompt':
         if (this.prompt.kind === 'const') return ['CONSTANT', 'Number 01~40?', '[' + pad(this.prompt.digits, 2).replace(/ /g, '_') + ']'];
         if (this.prompt.kind === 'conv') return ['CONVERSION', 'Number 01~40?', '[' + pad(this.prompt.digits, 2).replace(/ /g, '_') + ']'];
@@ -1651,6 +1725,12 @@
       sc.lineMode = true;
     } else if (this.screen === 'eqn') {
       sc.eqn = this._eqnScreen();
+      sc.lineMode = this.ed.lineMode;
+    } else if (this.screen === 'stat') {
+      sc.eqn = this._statScreen();      // same grid layout as the EQN coefficient screen
+      sc.lineMode = this.ed.lineMode;
+    } else if (this.screen === 'table') {
+      sc.table = this._tableScreen();   // f(X)= / Start? End? Step? / X F(X) grid (EQN grid layout)
       sc.lineMode = this.ed.lineMode;
     } else if (this.screen === 'message' && this.message && this.message.solve) {
       sc.solve = { expr: this.message.expr, rows: this.message.rows };

@@ -99,5 +99,8 @@
 - 오류: 계수 개수 불일치·복소수 계수·a=0(2·3차)·det=0(연립)·해 범위 초과 → `Math ERROR`. 모르는 `type` → `Syntax ERROR`. `evalCoeff`에서 `i` 토큰·`:`·Pol/Rec → `Syntax ERROR`, 0 나눗셈 → `Math ERROR`.
 - `memory`는 읽기만 한다(Ans 갱신은 UI가 하지 않는다, 명세 C-5).
 
+## TABLE 모드 (`table.js`)
+`tableCheck(tokens)`, `tableParam(tokens, settings, memory)`, `tableGenerate(fTokens, start, end, step, settings, memory, opts)` → `{ok, error, errorPos, stage, count, rows:[{index, x, xText, xNode, fx, fxText, fxNode, error}], lastX}`. 최대 30행(`Insufficient MEM`), 금지 함수 Syntax ERROR, 행 오류는 그 셀만 `ERROR`. 자세한 계약과 가정은 `_workspace/02_engine_changes.md` TABLE 절.
+
 ## 테스트
-`node tests/engine/run.js [id 필터]` (`VERBOSE=1` 이면 통과 항목도 출력). 파일: `comp`, `cmplx`, `eqn`, `rules`, `qa_regress` `.test.js`.
+`node tests/engine/run.js [id 필터]` (`VERBOSE=1` 이면 통과 항목도 출력). 파일: `comp`, `cmplx`, `eqn`, `stat`, `table`, `rules`, `qa_regress` `.test.js`.

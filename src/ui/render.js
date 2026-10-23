@@ -41,6 +41,7 @@
     if (id.indexOf('const:') === 0) return '<span class="cst">' + esc(FX.Tables.constSymbol(id.slice(6))) + '</span>';
     if (id.indexOf('conv:') === 0) return '<span class="cnv">' + esc(FX.Tables.convLabel(id.slice(5))) + '</span>';
     if (id.indexOf('lbl:') === 0) return esc(id.slice(4));
+    if (/^(st|sp|sf):/.test(id) && FX.StatLabels) return FX.StatLabels.html(id);
     return esc(id);
   }
 
@@ -173,7 +174,7 @@
   /* ---------------- indicators ---------------- */
   var IND_ORDER = [
     ['S', 'S'], ['A', 'A'], ['M', 'M'], ['STO', 'STO'], ['RCL', 'RCL'], ['STAT', 'STAT'], ['CMPLX', 'CMPLX'],
-    ['MAT', 'MAT'], ['VCT', 'VCT'], ['D', 'D'], ['R', 'R'], ['G', 'G'], ['FIX', 'FIX'], ['SCI', 'SCI'],
+    ['D', 'D'], ['R', 'R'], ['G', 'G'], ['FIX', 'FIX'], ['SCI', 'SCI'],
     ['Math', 'Math▲'], ['down', '▼'], ['up', '▲'], ['Disp', 'Disp']
   ];
 
@@ -200,7 +201,7 @@
 
   Renderer.prototype.render = function (sc) {
     var r = this.root;
-    r.className = r.className.replace(/\s*lcd-(off|kind-\w+|line|math|res-line|rows|eqn-edit)\b/g, '');
+    r.className = r.className.replace(/\s*lcd-(off|kind-\w+|line|math|res-line|rows|eqn-edit|table)\b/g, '');
     // CONTRAST setting 0..10: default 5 -> .95 (11차: darker ink), 0 -> .70, 9..10 -> 1
     r.style.setProperty('--ink-alpha', String(Math.min(1, 0.70 + (sc.contrast == null ? 5 : sc.contrast) * 0.05)));
     if (!sc.power) {
@@ -238,6 +239,7 @@
         } else txt = sc.lines;
         break;
       case 'eqn':
+      case 'stat':
         if (sc.eqn && sc.eqn.sub === 'edit') {
           // coefficient grid: drawn in the text layer, nothing on the input/result lines
           this.inInner.innerHTML = '';
@@ -259,6 +261,29 @@
           break;
         }
         txt = sc.lines;     // equation type menu (4 lines, EQN_1.png)
+        break;
+      case 'table':
+        // TABLE (MODE 7): f(X)= entry, Start?/End?/Step? prompt, or the X / F(X) grid
+        var tb = sc.table;
+        if (tb && tb.sub === 'edit') {
+          this.inInner.innerHTML = '';
+          this.outInner.innerHTML = '';
+          this.txtEl.innerHTML = eqnEditHTML(tb, sc.lineMode);
+          r.className += ' lcd-eqn-edit lcd-table';
+          this.scrollL.className = 'lcd-scroll-l';
+          this.scrollR.className = 'lcd-scroll-r';
+          return;
+        }
+        if (tb && tb.sub === 'fx') {
+          inHTML = '<span class="a">' + esc(tb.label) + '</span>' +
+            (tb.expr.length ? rowHTML(tb.expr, [], { cursor: tb.cursor, lineMode: sc.lineMode }, false)
+              : CURSOR.replace('cur"', 'cur ' + (tb.cursor.style || 'bar') + '"'));
+        } else if (tb) {
+          inHTML = esc(tb.label);
+          outHTML = tb.value != null ? nodeHTML(tb.value) + CURSOR.replace('cur"', 'cur bar"')
+            : rowHTML(tb.expr, [], { cursor: tb.cursor, lineMode: sc.lineMode }, false);
+          r.className += ' lcd-res-line';
+        }
         break;
       case 'message':
         if (sc.solve) {

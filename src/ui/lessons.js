@@ -469,6 +469,9 @@
    *   .ls-toc-pane  table of contents (renderToc). A click emits 'fxsim:lesson-select' on root.
    *   .ls-follow    follow-along pane (renderFollow). Listens to 'fxsim:lesson-select' and starts the lesson.
    * Below 1000px the toc collapses (.ls-toc-pane.open), its toggle shows the current lesson.
+   * Tree toc: course and unit titles are always shown; each unit's lesson list is folded. The unit title is a
+   * button (aria-expanded, ▸ / ▾). When the current lesson changes, only its unit is opened (units the student
+   * opened by hand stay open until then). Reserved units ("준비 중") have no button.
    */
   function mount(root, calc) {
     var doc = G.document;
@@ -515,6 +518,8 @@
     var dev = devMode();
     var lastId = loadLast();
     var done = loadDone();     // ids of finished lessons (completion mark)
+    var expanded = {};         // unit id -> true: units whose lesson list is open (tree toc)
+    var foldFor = null;        // current lesson the fold state was last reset for
 
     // collapsible toc (narrow screens only; CSS always shows it from 1000px)
     function setTocOpen(open) {
@@ -577,6 +582,17 @@
         }).join('');
         return;
       }
+      // folding: a new current lesson opens its own unit only and drops the units the student opened
+      var curUnit = curE ? curE.unit.id : null;
+      if (cur && cur !== foldFor) {
+        foldFor = cur;
+        expanded = {};
+        if (curUnit) expanded[curUnit] = true;
+      }
+      // keep the current lesson's unit title where it was on the screen while the units above fold
+      var anchor = curUnit ? unitEl(curUnit) : null;
+      var tr0 = toc.getBoundingClientRect && toc.clientHeight ? toc.getBoundingClientRect().top : null;
+      var y0 = anchor && tr0 != null ? anchor.getBoundingClientRect().top - tr0 : null;
       toc.innerHTML = model.courses.map(function (c) {
         return '<section class="ls-course"><h3>과정 ' + esc(c.no) + '. ' + esc(c.title) + '</h3>' +
           c.units.map(function (u) {
@@ -585,11 +601,39 @@
               return '<section class="ls-unit ls-reserved"><h4><span class="ls-uno">' + esc(u.no) + '</span> ' + esc(u.title) +
                 ' <span class="ls-soon">준비 중</span></h4>' + (u.note && u.note !== '준비 중' ? '<p class="ls-note">' + esc(u.note) + '</p>' : '') + '</section>';
             }
-            return '<section class="ls-unit"><h4><span class="ls-uno">' + esc(u.no) + '</span> ' + esc(u.title) +
-              ' <span class="ls-cnt">' + u.items.length + '개' + (u.minutes ? ' · ' + u.minutes + '분' : '') + '</span></h4><ol>' +
+            var open = !!expanded[u.id], lid = 'ls-u-' + u.id.replace(/[^\w-]/g, '_');
+            return '<section class="ls-unit' + (open ? ' open' : '') + (u.id === curUnit ? ' has-cur' : '') + '" data-unit="' + esc(u.id) + '">' +
+              '<h4 class="ls-uh"><button type="button" class="ls-unit-btn" aria-expanded="' + open + '" aria-controls="' + lid + '">' +
+              '<span class="ls-fold" aria-hidden="true">' + (open ? '▾' : '▸') + '</span>' +
+              '<span class="ls-ut"><span class="ls-uno">' + esc(u.no) + '</span> ' + esc(u.title) + '</span>' +
+              '<span class="ls-cnt">' + u.items.length + '개' + (u.minutes ? ' · ' + u.minutes + '분' : '') + '</span></button></h4>' +
+              '<ol id="' + lid + '"' + (open ? '' : ' hidden') + '>' +
               u.items.map(function (it) { return itemHTML(it, cur); }).join('') + '</ol></section>';
           }).join('') + '</section>';
       }).join('');
+      if (y0 != null) {
+        var a1 = unitEl(curUnit);
+        if (a1) toc.scrollTop += a1.getBoundingClientRect().top - toc.getBoundingClientRect().top - y0;
+      }
+      if (cur && toc.clientHeight) scrollTocToCurrent();
+    }
+    function unitEl(id) {
+      var all = toc.querySelectorAll('.ls-unit[data-unit]');
+      for (var i = 0; i < all.length; i++) if (all[i].getAttribute('data-unit') === id) return all[i];
+      return null;
+    }
+    // open / fold one unit in place (no redraw: the list keeps its scroll position)
+    function setUnitOpen(id, open) {
+      var sec = unitEl(id);
+      if (!sec) return false;
+      open = !!open;
+      if (open) expanded[id] = true; else delete expanded[id];
+      sec.classList.toggle('open', open);
+      var b = sec.querySelector('.ls-unit-btn'), ol = sec.querySelector('ol');
+      b.setAttribute('aria-expanded', open ? 'true' : 'false');
+      b.querySelector('.ls-fold').textContent = open ? '▾' : '▸';
+      ol.hidden = !open;
+      return true;
     }
 
     // lessons / toc data in use (boot, and tests: useData)
@@ -598,6 +642,8 @@
       runner.lessons = lessons;
       model = buildToc(lessons, tocData, { dev: dev });
       tocKey = null;
+      expanded = {};
+      foldFor = null;
     }
 
     function render() {
@@ -640,8 +686,17 @@
       hint.className = 'ls-hint' + (runner.status === 'wrong' ? ' emph' : '');
       q('.ls-expect').innerHTML = '<b>기대 화면</b> ' + esc(s.expect || '');
       var st = q('.ls-status');
-      if (runner.status === 'correct') st.innerHTML = '<span class="good">정답</span> "다음 단계"를 누르거나 다음 키를 바로 누르세요.';
-      else if (done) st.innerHTML = '<span class="good">정답, 레슨 완료</span> 다른 레슨을 고르거나 "처음부터"로 다시 연습하세요.';
+      if (runner.status === 'correct') {
+        st.innerHTML = '<span class="good">정답</span> 잠시 후 다음 단계로 넘어갑니다. (바로 가려면 "다음 단계" 또는 다음 키)';
+        scheduleAdvance();
+      }
+      else if (done) {
+        var nextId = nextLessonId(l.id);
+        st.innerHTML = nextId
+          ? '<span class="good">정답, 레슨 완료</span> 잠시 후 다음 레슨으로 넘어갑니다. ("처음부터"로 다시 연습할 수도 있어요.)'
+          : '<span class="good">정답, 마지막 레슨 완료</span> 다른 레슨을 고르거나 "처음부터"로 다시 연습하세요.';
+        if (nextId) scheduleNextLesson(l.id, nextId);
+      }
       else if (runner.status === 'wrong' && runner.reason === 'order') {
         var extra = runner.pressed.length - mt, want = s.keys[mt];
         st.innerHTML = '<span class="bad">' + esc(runner.pressed[runner.pressed.length - 1]) + ' 키는 안내와 다릅니다.</span> ' +
@@ -657,6 +712,33 @@
       q('.ls-show').disabled = done;
       var ul = root.querySelector('.ls-pit ul');
       ul.innerHTML = (l.pitfalls || []).map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('');
+    }
+
+    // a finished lesson moves on to the next one in the table of contents after a pause
+    var lessonTimer = null, NEXT_LESSON_MS = 2500;
+    function nextLessonId(id) {
+      var i = model.order.indexOf(id);
+      return i >= 0 && i + 1 < model.order.length ? model.order[i + 1] : null;
+    }
+    function scheduleNextLesson(id, nextId) {
+      if (lessonTimer || !G.setTimeout) return;
+      lessonTimer = G.setTimeout(function () {
+        lessonTimer = null;
+        if (runner.lesson && runner.lesson.id === id && runner.status === 'done') emitSelect(nextId);
+      }, NEXT_LESSON_MS);
+    }
+
+    // a correct step moves on by itself after a short pause (long enough to read the result)
+    var advanceTimer = null, ADVANCE_MS = 1500;
+    function scheduleAdvance() {
+      if (advanceTimer || !G.setTimeout) return;
+      var idx = runner.stepIdx, lesson = runner.lesson;
+      advanceTimer = G.setTimeout(function () {
+        advanceTimer = null;
+        if (runner.lesson !== lesson || runner.status !== 'correct') return;
+        if (runner.stepIdx === idx) runner.next();
+        else scheduleAdvance();   // the student moved on and solved a later step meanwhile
+      }, ADVANCE_MS);
     }
 
     function act(fn) {
@@ -700,10 +782,22 @@
 
     // toc -> event (the toc does not know how a lesson is run)
     toc.addEventListener('click', function (e) {
+      var ub = e.target && e.target.closest ? e.target.closest('.ls-unit-btn') : null;
+      if (ub) {
+        if (e.detail && ub.blur) ub.blur();          // mouse / touch: a later Enter is '=' again
+        var sec = ub.closest('.ls-unit');
+        setUnitOpen(sec.getAttribute('data-unit'), ub.getAttribute('aria-expanded') !== 'true');
+        return;
+      }
       var b = e.target && e.target.closest ? e.target.closest('.ls-item') : null;
       if (!b) return;
       if (b.blur) b.blur();
       emitSelect(b.getAttribute('data-id'));
+    });
+    // keyboard: Enter on a focused toc button activates it (app.js would otherwise take Enter as '=')
+    toc.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target && e.target.closest && e.target.closest('.ls-unit-btn, .ls-item')) e.stopPropagation();
     });
     resume.addEventListener('click', function (e) {
       if (e.currentTarget.blur) e.currentTarget.blur();
@@ -888,7 +982,22 @@
       getRunner: function () { return runner; },
       highlighted: function () { return hlKey; },
       // QA / tests: start a lesson as a click on its table-of-contents entry would
-      open: function (id) { var b = toc.querySelector('.ls-item[data-id="' + id + '"]'); if (b) b.click(); return !!b; },
+      // (a folded unit is opened first, as a student would)
+      open: function (id) {
+        var b = toc.querySelector('.ls-item[data-id="' + id + '"]');
+        if (!b) return false;
+        var sec = b.closest('.ls-unit[data-unit]');
+        if (sec && !expanded[sec.getAttribute('data-unit')]) sec.querySelector('.ls-unit-btn').click();
+        b.click();
+        return true;
+      },
+      // tree toc: open (true) / fold (false) / toggle (undefined) a unit; expandedUnits() lists the open ones
+      toggleUnit: function (id, open) {
+        var sec = unitEl(id);
+        if (!sec) return false;
+        return setUnitOpen(id, open == null ? !expanded[id] : open);
+      },
+      expandedUnits: function () { return Object.keys(expanded).filter(function (k) { return expanded[k]; }); },
       // narrow screens: unfold the table of contents (it is always visible from 1000px)
       showToc: function () { setTocOpen(true); },
       // shell (calc mode): stop the running lesson; the calculator state is left as it is

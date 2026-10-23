@@ -58,6 +58,9 @@
     if (VARS.indexOf(id) >= 0) return { type: 'var', name: id };
     if (id.indexOf('const:') === 0) return { type: 'const', name: 'sc', index: parseInt(id.slice(6), 10) };
     if (id.indexOf('conv:') === 0) return { type: 'conv', index: parseInt(id.slice(5), 10) };
+    if (id.indexOf('st:') === 0) return { type: 'stat', name: id.slice(3) };                    // STAT values (SHIFT 1 menus)
+    if (id.indexOf('sp:') === 0) return { type: 'statpost', name: id.slice(3) };                // x-hat y-hat x-hat1 x-hat2 and the t command
+    if (id.indexOf('sf:') === 0) return { type: 'fn', name: id.slice(3).replace('(', '') };     // P( Q( R(
     return null; // display-only atoms ('→A', 'M+', 'lbl:...')
   }
 
@@ -103,7 +106,7 @@
   function toEngineMemory(mem) {
     var vars = {};
     VARS.forEach(function (v) { vars[v] = mem[v]; });
-    return { ans: mem.Ans, vars: vars };
+    return { ans: mem.Ans, vars: vars, stat: mem.stat || null };
   }
 
   function withAns(mem, value) {
@@ -306,7 +309,85 @@
     return { ok: true, error: null, type: r.type || type, solutions: list };
   }
 
+  // rows: [{x, y, f}] engine values (null = empty cell) -> engine statistics object (memory.stat)
+  function statAnalyze(type, rows) {
+    var E = engine();
+    if (!E || typeof E.statAnalyze !== 'function') return { ok: false, error: 'Math ERROR' };
+    try { return E.statAnalyze(type, rows); } catch (e) { return { ok: false, error: (e && (e.calcError || e.kind)) || 'Math ERROR' }; }
+  }
+
+  /* ---------------- TABLE (MODE 7) ---------------- */
+  // Contract: src/engine/table.js (CalcEngine.tableCheck / tableParam / tableGenerate), _workspace/02_engine_changes.md.
+  // The UI never computes X values or f(X) itself. Without the engine functions every call reports
+  // missing:true and calculator shows a "not loaded" message.
+  function engSettings(settings) {
+    var s = {};
+    for (var k in settings) if (OPT_KEYS.indexOf(k) < 0) s[k] = settings[k];
+    if (s.disp && !s.decimalSep) s.decimalSep = s.disp;
+    s.mode = 'TABLE';
+    return s;
+  }
+  function tableMissing(name) {
+    var E = engine();
+    return !E || typeof E[name] !== 'function';
+  }
+  // manual p.42: unit conversion (CONV) is not usable in TABLE (CONST is). The engine's tableCheck rejects it;
+  // this scan only covers the engine-missing fallbacks below. -> top-level index or -1
+  function convIndex(tokens) {
+    function has(t) {
+      if (!t) return false;
+      if (t.type === 'conv') return true;
+      var sl = t.slots || [];
+      for (var i = 0; i < sl.length; i++) for (var j = 0; j < (sl[i] || []).length; j++) if (has(sl[i][j])) return true;
+      return false;
+    }
+    for (var i = 0; tokens && i < tokens.length; i++) if (has(tokens[i])) return i;
+    return -1;
+  }
+  // f(X) entry check on `=` -> {ok, error, errorPos}
+  function tableCheck(tokens) {
+    if (tableMissing('tableCheck')) {
+      var ci = convIndex(tokens);
+      if (ci >= 0) return { ok: false, error: 'Syntax ERROR', errorPos: ci };
+      return { ok: !!(tokens && tokens.length), error: tokens && tokens.length ? null : 'Syntax ERROR', errorPos: null };
+    }
+    try { return engine().tableCheck(tokens); } catch (e) { return { ok: false, error: (e && (e.calcError || e.kind)) || 'Syntax ERROR', errorPos: null }; }
+  }
+  // one Start/End/Step entry -> {ok, value, error, errorPos}
+  function tableParam(tokens, settings, mem) {
+    if (tableMissing('tableParam')) {
+      var ci = convIndex(tokens);
+      if (ci >= 0) return { ok: false, error: 'Syntax ERROR', errorPos: ci };
+      return run(tokens, copySettings(settings, 'COMP'), mem);
+    }
+    try { return normalizeResult(engine().tableParam(tokens, engSettings(settings), toEngineMemory(mem || freshMemory()))); }
+    catch (e) { return { ok: false, error: (e && (e.calcError || e.kind)) || 'Math ERROR', errorPos: null }; }
+  }
+  // -> {ok, error, errorPos, stage, rows:[{x, xNode, xText, fx, fxNode, fxText, error}], lastX} | {ok:false, missing:true}
+  function tableGenerate(tokens, start, end, step, settings, mem) {
+    if (tableMissing('tableGenerate')) return { ok: false, error: 'No Engine', errorPos: null, missing: true };
+    try {
+      var r = engine().tableGenerate(tokens, start, end, step, engSettings(settings), toEngineMemory(mem || freshMemory()));
+      if (!r || !r.ok || r.error) return { ok: false, error: (r && r.error) || 'Math ERROR', errorPos: r ? r.errorPos : null, stage: r ? r.stage : null };
+      return r;
+    } catch (e) {
+      return { ok: false, error: (e && (e.calcError || e.kind)) || 'Math ERROR', errorPos: null };
+    }
+  }
+  // initial Start / End / Step values (manual 62쪽: 1, 5, 1) as engine values
+  function tableDefaults() {
+    var E = engine(), d = (E && E.TABLE_DEFAULTS) || { start: 1, end: 5, step: 1 };
+    function v(n) { return E && typeof E.fromInput === 'function' ? E.fromInput(String(n)) : n; }
+    return { start: v(d.start), end: v(d.end), step: v(d.step) };
+  }
+
   FX.Adapter = {
+    tableCheck: tableCheck,
+    tableParam: tableParam,
+    tableGenerate: tableGenerate,
+    tableDefaults: tableDefaults,
+    hasTable: function () { return !tableMissing('tableGenerate'); },
+    statAnalyze: statAnalyze,
     EQN_TYPES: EQN_TYPES,
     evalCoeff: evalCoeff,
     solveEqn: solveEqn,

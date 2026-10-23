@@ -11,6 +11,7 @@
 <div class="shell-bar"><span class="shell-title">공학계산기 시뮬레이터</span></div>
 <div class="page mode-calc" data-mode="calc">
   <div class="calc" aria-label="공학계산기 시뮬레이터">
+    <span class="sim-ver" aria-label="프로그램 버전"></span>
     <div class="brand"><img class="school-logo" src="src/ui/assets/school-logo-engraved.png" alt="한국폴리텍대학 광주캠퍼스"><span class="sim-title"><span>공학계산기</span><span>시뮬레이터</span></span><button type="button" class="mode-switch" role="switch" aria-checked="false" aria-label="레슨 모드" title="계산용 / 레슨용 전환"><span class="ms-pill"><span class="ms-knob" aria-hidden="true"></span><span class="ms-lbl ms-calc">계산</span><span class="ms-lbl ms-lesson">레슨</span></span></button></div>
     <div class="model">
       <span class="m1"></span>
@@ -31,7 +32,7 @@
   </div>
 
   <div class="side">
-    <h1>공학계산기 시뮬레이터 (COMP, CMPLX, EQN)</h1>
+    <h1>공학계산기 시뮬레이터 (COMP, CMPLX, STAT, EQN, TABLE)</h1>
     <span class="engine-badge"></span>
     <section class="lesson-panel" aria-label="레슨" hidden></section>
     <div class="calc-pane">
@@ -60,6 +61,8 @@
     <p>MODE 2로 진입. <i>i</i> = ENG, ∠ = SHIFT (−), Abs = SHIFT hyp, SHIFT 2 = CMPLX 메뉴(1 arg, 2 Conjg, 3 ▶r∠θ, 4 ▶a+b<i>i</i>). 결과 형식은 SHIFT MODE ▼ 3.</p>
     <h2>EQN 모드</h2>
     <p>MODE 5로 진입해 방정식 종류(1~4)를 고른다. 계수를 넣고 = 로 다음 칸, 방향키로 칸 이동, AC는 계수 모두 0. 계수를 다 넣은 뒤 = 를 한 번 더 누르면 해가 나오고, = 또는 ▼ ▲로 해 사이를 이동한다. 해 화면의 AC는 계수 편집으로 돌아간다.</p>
+    <h2>TABLE 모드</h2>
+    <p>MODE 7로 진입. f(X)=에 X(ALPHA ))가 들어간 식을 넣고 = → Start? End? Step?(처음 값 1, 5, 1)마다 값을 넣고 = (그냥 = 는 보이는 값 사용). 표는 ▲▼ ◀▶로 이동하고 아래 줄에 고른 칸 값이 나온다. X 값이 30개를 넘으면 Insufficient MEM. 표에서 AC는 f(X)= 로 돌아간다.</p>
     <h2>노란 글씨 / 빨간 글씨</h2>
     <p>키 위 노란 글씨는 SHIFT 후, 빨간 글씨는 ALPHA 후 동작합니다. SETUP은 SHIFT MODE.</p>
     </div>
@@ -74,6 +77,8 @@
 <script src="src/engine/format.js"></script>
 <script src="src/engine/api.js"></script>
 <script src="src/engine/eqn.js"></script>
+<script src="src/engine/stat.js"></script>
+<script src="src/engine/table.js"></script>
 <!-- UI (plain scripts, no modules, so file:// works) -->
 <script src="src/ui/fallback-engine.js"></script>
 <script src="src/ui/tables.js"></script>
@@ -81,6 +86,8 @@
 <script src="src/ui/editor.js"></script>
 <script src="src/ui/adapter.js"></script>
 <script src="src/ui/calculator.js"></script>
+<script src="src/ui/stat.js"></script>
+<script src="src/ui/table.js"></script>
 <script src="src/ui/render.js"></script>
 <script src="src/ui/app.js"></script>
 <!-- lessons: lessons-data.js = file:// copy of src/tutorial/lessons.json (node tests/ui/lessons.check.js --write) -->

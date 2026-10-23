@@ -1,8 +1,8 @@
 /*
  * CalcEngine parser: 의미 토큰(TOKENS.md) → AST.
  * 우선순위(설명서 technical_informatoin/sequence, 낮은 번호가 먼저):
- *  1 괄호  2 괄호 포함 함수(sin( 등)  3 후위 함수(x², x⁻¹, x!, °′″, %, °ʳᵍ), x^, ⁿ√
- *  4 분수(⌟)  5 (−)  6 단위변환  7 생략된 곱셈  8 nPr nCr ∠  10 × ÷  11 + −
+ *  1 괄호  2 괄호 포함 함수(sin( 등)  3 후위 함수(x², x⁻¹, x!, °′″, %, °ʳᵍ, ▸t), x^, ⁿ√
+ *  4 분수(⌟)  5 (−)  6 단위변환, STAT 추정값(x̂ ŷ x̂1 x̂2)  7 생략된 곱셈  8 nPr nCr ∠  10 × ÷  11 + −
  * (9 내적, 12~13 논리연산은 쓰지 않음)
  * CMPLX 모드(opts.mode==='CMPLX')에서만: imag(i), angle(∠), fn arg/conjg, 식 끝 cmd polar/rect. 다른 모드에서는 Syntax ERROR.
  */
@@ -17,8 +17,13 @@
     sinh: [1, 1], cosh: [1, 1], tanh: [1, 1], asinh: [1, 1], acosh: [1, 1], atanh: [1, 1],
     log: [1, 2], ln: [1, 1], exp: [1, 1], pow10: [1, 1], sqrt: [1, 1], cbrt: [1, 1], abs: [1, 1],
     pol: [2, 2], rec: [2, 2], ranint: [2, 2], rnd: [1, 1], integ: [3, 4], diff: [2, 3], sum: [3, 3],
-    arg: [1, 1], conjg: [1, 1]
+    arg: [1, 1], conjg: [1, 1],
+    normP: [1, 1], normQ: [1, 1], normR: [1, 1]
   };
+  var STAT_FN = { normP: 1, normQ: 1, normR: 1 };   // STAT 전용: 정규분포 P( Q( R(
+  // STAT 전용 후위 명령. 매뉴얼 71쪽: 추정값 x̂ ŷ x̂1 x̂2 는 우선순위 6(단위변환과 같음), ▸t 는 우선순위 3(x², x! 과 같음)
+  var STAT_POST = { xhat: 1, xhat1: 1, xhat2: 1, yhat: 1 };
+  var STAT_POST_3 = { tnorm: 1 };
   var CMPLX_FN = { arg: 1, conjg: 1 };
   var CMDS = { polar: 1, rect: 1 };
   var TPL_SLOTS = {
@@ -71,6 +76,7 @@
   P.lastPos = function () { var t = this.toks[this.i - 1]; return t ? this.mapPos(t._e) : this.mapPos(0); };
   P.isOp = function (tk, v) { return tk && tk.type === 'op' && tk.value === v; };
   P.cmplx = function () { return this.opts.mode === 'CMPLX'; };
+  P.stat = function () { return this.opts.mode === 'STAT'; };
   P.node = function (n, s) { n.s = s; n.e = this.lastPos(); return n; };
 
   P.parseExpr = function () { return this.parseAdd(); };
@@ -123,7 +129,7 @@
     if (!tk) return false;
     switch (tk.type) {
       case 'paren': return tk.value === '(';
-      case 'fn': case 'ran': case 'var': case 'const': case 'ans': case 'exp10': case 'imag': return true;
+      case 'fn': case 'ran': case 'var': case 'const': case 'ans': case 'exp10': case 'imag': case 'stat': return true;
       case 'tpl': return tk.name !== 'pow';
       default: return false;
     }
@@ -140,8 +146,14 @@
   P.parseConv = function () {
     var s = this.peek() ? this.mapPos(this.peek()._s) : null;
     var a = this.parseNeg();
-    while (this.peek() && this.peek().type === 'conv') {
+    while (this.peek() && (this.peek().type === 'conv' || this.peek().type === 'statpost')) {
       var tk = this.next();
+      if (tk.type === 'statpost') {   // STAT 추정값(x̂ ŷ x̂1 x̂2): 우선순위 6, 단위변환과 같다. ▸t 는 parsePost 에서 처리
+        // ▸t 가 6위 명령 뒤에 오면(3x̂▸t) 왼쪽 전체에 붙는 것 말고는 해석이 없다
+        if (!this.stat() || !(STAT_POST[tk.name] || STAT_POST_3[tk.name])) throw this.err(tk);
+        a = this.node({ t: 'statpost', name: tk.name, a: a }, s);
+        continue;
+      }
       var idx = tk.index | 0;
       if (idx < 1 || idx > 40) throw this.err(tk);
       a = this.node({ t: 'conv', index: idx, a: a }, s);
@@ -185,6 +197,11 @@
         if (!POSTFIX[tk.name]) throw this.err(tk);
         this.next();
         a = this.node({ t: 'post', name: tk.name, a: a }, s);
+      } else if (tk.type === 'statpost' && STAT_POST_3[tk.name]) {
+        // ▸t: 매뉴얼 71쪽 우선순위 3(입력값 뒤에 오는 함수). (−)3▸t = −(3▸t)
+        if (!this.stat()) throw this.err(tk);
+        this.next();
+        a = this.node({ t: 'statpost', name: tk.name, a: a }, s);
       } else if (tk.type === 'tpl' && tk.name === 'pow') {
         this.next();
         var ex = this.parseSlot(tk, 0);
@@ -283,7 +300,7 @@
         return this.node({ t: 'paren', a: g }, s);
       case 'fn': {
         var spec = FN_ARGS[tk.name];
-        if (!spec || (CMPLX_FN[tk.name] && !this.cmplx())) throw this.err(tk);
+        if (!spec || (CMPLX_FN[tk.name] && !this.cmplx()) || (STAT_FN[tk.name] && !this.stat())) throw this.err(tk);
         this.next();
         var args = [];
         var t2 = this.peek();
@@ -328,6 +345,9 @@
         this.next();
         return this.node({ t: 'var', name: tk.name }, s);
       case 'ans': this.next(); return this.node({ t: 'ans' }, s);
+      case 'stat':
+        if (!this.stat() || !tk.name) throw this.err(tk);
+        this.next(); return this.node({ t: 'stat', name: tk.name }, s);
       case 'imag':
         if (!this.cmplx()) throw this.err(tk);
         this.next(); return this.node({ t: 'imag' }, s);

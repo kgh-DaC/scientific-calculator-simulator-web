@@ -11,6 +11,8 @@
   'use strict';
   var FX = G.FX;
   var doc = G.document;
+  // program version: the only place it is defined (shown at the top right of the calculator body)
+  FX.VERSION = 'v1.3';
 
   /* ---------------- keypad ---------------- */
   function legendHTML(k) {
@@ -107,6 +109,8 @@
 
     var body = doc.querySelector('.calc');
     buildKeypad(body);
+    var ver = body.querySelector('.sim-ver');
+    if (ver) { ver.textContent = FX.VERSION; ver.title = '프로그램 버전 ' + FX.VERSION; }
     var renderer = new FX.Render.Renderer(doc.querySelector('.lcd'));
     var debug = doc.querySelector('.state-line');
     var badge = doc.querySelector('.engine-badge');

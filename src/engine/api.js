@@ -21,7 +21,7 @@
     if (o.io !== 'MathO' && o.io !== 'LineO' && o.io !== 'LineIO') o.io = 'MathO';
     if (!o.decimalSep && o.disp) o.decimalSep = o.disp;
     var md = String(o.mode || 'COMP').toUpperCase();
-    o.mode = (md === 'CMPLX' || md === 'EQN') ? md : 'COMP'; // EQN 계수 식은 COMP 와 같은 규칙으로 계산(복소수 토큰 불가)
+    o.mode = (md === 'CMPLX' || md === 'EQN' || md === 'STAT') ? md : 'COMP'; // EQN 계수 식은 COMP 와 같은 규칙으로 계산(복소수 토큰 불가)
     var cf = s.cmplxFormat || s.complex;
     o.cmplxFormat = (cf === 'r∠θ' || cf === 'polar' || cf === 'r<θ' || cf === 'rθ') ? 'r∠θ' : 'a+bi';
     return o;
@@ -29,7 +29,7 @@
   function normMemory(m) {
     m = m || {};
     var vars = m.vars || {};
-    return { ans: m.ans !== undefined ? m.ans : (m.Ans !== undefined ? m.Ans : 0), vars: vars };
+    return { ans: m.ans !== undefined ? m.ans : (m.Ans !== undefined ? m.Ans : 0), vars: vars, stat: m.stat || null };
   }
   function errKind(e) {
     if (e && e.calcError) return e.calcError;
@@ -124,7 +124,7 @@
       var ans = memory.ans, res = null, steps = [];
       for (var i = 0; i < stmts.length; i++) {
         var st = stmts[i];
-        var mem = { ans: ans, vars: memory.vars };
+        var mem = { ans: ans, vars: memory.vars, stat: memory.stat };
         var ctx = new EV.Ctx(settings, mem, opts);
         var node = st.rhs || st.expr;
         EV.checkStack(st.expr);

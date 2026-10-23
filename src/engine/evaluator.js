@@ -502,7 +502,9 @@
   // Ridders 외삽 미분. dq(i)는 i번째 간격 h0·(5/7)^i 의 중심차분 몫(유리수 Q).
   // 외삽표도 유리수로 계산하므로 다항식은 h² 항이 정확히 소거된다(x³│0 → 0, x³│1e-5 → 3e-10).
   // 반환: { q: 추정값(Q), err: 오차 추정(double) }
-  function derivative(dq) {
+  // noise(i): i번째 몫의 반올림 잡음 하한(f 값이 15자리 근사일 때만 > 0). 근사값이 우연히 같아
+  // 차이가 0이 되어도 오차 추정이 0(가짜 확신)이 되지 않게 한다(A5: 10¹²+e^X│0 등).
+  function derivative(dq, noise) {
     var NTAB = 10, CON2 = Q(49n, 25n), BIG = 1e300, SAFE = 2;
     var a = [], ans = null, err = BIG;
     function dist(x, y) { return Math.abs(C.qToDouble(C.qsub(x, y))); }
@@ -515,7 +517,7 @@
       for (var j = 1; j <= i; j++) {
         a[j][i] = C.qdiv(C.qsub(C.qmul(a[j - 1][i], fac), a[j - 1][i - 1]), C.qsub(fac, Q1));
         fac = C.qmul(CON2, fac);
-        var errt = Math.max(dist(a[j][i], a[j - 1][i]), dist(a[j][i], a[j - 1][i - 1]));
+        var errt = Math.max(dist(a[j][i], a[j - 1][i]), dist(a[j][i], a[j - 1][i - 1]), noise ? noise(i) : 0);
         if (errt <= err) { err = errt; ans = a[j][i]; }
       }
       if (err === 0 || dist(a[i][i], a[i - 1][i - 1]) >= SAFE * err) break;
@@ -563,23 +565,35 @@
       // diff: X = a ± h 를 정확값(유리수 간격)으로 대입하고 차분도 값 연산으로 구한다.
       // 다항식·유리식은 차분이 정확해서 f(a)의 크기와 상관없이 기울기가 보존된다(QA-E1).
       var x0v = ev(args[1], ctx);
-      var fx = function (xv) { return withX(ctx, xv, function () { return ev(args[0], ctx); }); };
+      // tol (LineIO 3번째 인수, 매뉴얼: 생략 시 1×10⁻¹⁰, 생략 시에는 수렴 못 하면 tol 자동 조정)
+      var dtol = args[2] ? dbl(ev(args[2], ctx)) : null;
+      if (dtol !== null && !(dtol > 0)) throw mathErr();
+      var fx =function (xv) { return withX(ctx, xv, function () { return ev(args[0], ctx); }); };
       var fa = fx(x0v); // f(a) 정의 여부
       if (!isFinite(dbl(fa))) throw mathErr();
       var ax = Math.abs(dbl(x0v));
       var CONQ = Q(5n, 7n);
       var runD = function (h0) {
+        var nz = [];
         return derivative(function (i) {
           var hq = C.qmul(h0, C.qPowInt(CONQ, i));
           var hv = C.vq(hq);
-          var df = C.sub(fx(C.add(x0v, hv)), fx(C.sub(x0v, hv)));
-          return C.qdiv(C.numQ(df, 30), C.qmul(hq, Q(2n)));
-        });
+          // 차분은 C.sub 대신 두 값의 유리수 차로 구한다. C.sub 의 상쇄 잡음 제거(|차| ≤ 1e-13·|값| → 0)가
+          // 큰 f(a)에서 실제 기울기를 0으로 만들고 오차 추정까지 0으로 속이는 것을 막는다(A5).
+          var vp = fx(C.add(x0v, hv)), vm = fx(C.sub(x0v, hv));
+          var fp = C.numQ(vp, 30), fm = C.numQ(vm, 30);
+          // 15자리 근사값이면 각 값의 반올림 오차(상대 5e-15)를 2h 로 나눈 것이 몫의 잡음 하한
+          var ulp = (vp.k === 'a' ? Math.abs(C.qToDouble(fp)) : 0) + (vm.k === 'a' ? Math.abs(C.qToDouble(fm)) : 0);
+          nz[i] = ulp * 5e-15 / (2 * C.qToDouble(hq));
+          return C.qdiv(C.qsub(fp, fm), C.qmul(hq, Q(2n)));
+        }, function (i) { return nz[i]; });
       };
       // 시작 간격: 절대 0.1 과 상대 0.1·|a| 를 모두 시도해 오차 추정이 작은 쪽을 쓴다
       // (sin x│1e5 는 절대 간격, ln x│1e10 은 상대 간격이 맞다. ln x│0.05 는 상대 간격만 정의역 안).
-      var hs = [Q(1n, 10n)];
-      if (ax > 0 && ax !== 1) hs.push(C.qmul(Q(1n, 10n), C.qFromDouble(ax, 3)));
+      // A5 보강: f(a)가 커서 15자리 반올림 잡음이 큰 경우(10¹²+e^X│0 등)에는 더 넓은 간격 1 이 낫다.
+      // 오차 추정이 가장 작은 후보를 쓰므로 정확한 경우(다항식 등)는 결과가 바뀌지 않는다.
+      var hs = [Q(1n, 10n), Q1, Q(1n, 100n), Q(1n, 1000n)];
+      if (ax > 0 && ax !== 1 && ax !== 10) hs.push(C.qmul(Q(1n, 10n), C.qFromDouble(ax, 3)));
       var d = null, firstErr = null;
       hs.forEach(function (h0) {
         try {
@@ -593,6 +607,8 @@
       if (!d) throw firstErr;
       var dv = C.qToDouble(d.q);
       if (!isFinite(dv)) throw mathErr();
+      // tol 을 지정했는데 오차 추정이 tol 을 크게 넘으면 종료 조건 미충족 → Time Out (매뉴얼 오류표, ∫ 와 같은 기준)
+      if (dtol !== null && d.err > Math.max(dtol, 1e-14) * Math.max(1, Math.abs(dv)) * 10) throw CalcError('Time Out');
       // 크기가 오차 추정값 수준이면 반올림 잡음으로 보고 0 (sin′(π/2) 등). 고정 임계값은 쓰지 않는다(QA-E1).
       if (C.qIsZero(d.q) || Math.abs(dv) <= 4 * d.err) return C.V0;
       return C.checkRange(C.vapprox(C.qroundSig(d.q, 15)));
@@ -766,6 +782,11 @@
         return constV(n.index);
       case 'var': return memVal(lookupVar(n.name, ctx), ctx);
       case 'ans': return memVal(C.fromInput(ctx.memory ? ctx.memory.ans : 0), ctx);
+      case 'stat': return at(n.e, function () { return CE._stat.value(ctx.memory && ctx.memory.stat, n.name); });
+      case 'statpost': {
+        var sv = realOnly(ev(n.a, ctx));
+        return at(n.e, function () { return CE._stat.command(ctx.memory && ctx.memory.stat, n.name, sv); });
+      }
       case 'imag': return C.mkC(C.V0, C.V1);
       case 'ran': {
         var k = Math.floor(ctx.random() * 1000);
@@ -814,6 +835,7 @@
           return C.vq(Q(lo + BigInt(Math.floor(ctx.random() * span))));
         }
         case 'rnd': return rndV(a, ctx);
+        case 'normP': case 'normQ': case 'normR': return CE._stat.normal(name, a);
       }
       throw synErr();
     });
@@ -827,11 +849,11 @@
     function mx(a, b) { return { num: Math.max(a.num, b.num), cmd: Math.max(a.cmd, b.cmd) }; }
     function plus(u, dn, dc) { return { num: u.num + dn, cmd: u.cmd + dc }; }
     switch (n.t) {
-      case 'num': case 'const': case 'var': case 'ans': case 'ran': return { num: 1, cmd: 0 };
+      case 'num': case 'const': case 'var': case 'ans': case 'ran': case 'stat': return { num: 1, cmd: 0 };
       case 'paren': return plus(stackUse(n.a), 0, 1);
       case 'bin': return mx(stackUse(n.l), plus(stackUse(n.r), 1, 1));
       case 'neg': return plus(stackUse(n.a), 0, 1);
-      case 'post': case 'conv': return stackUse(n.a);
+      case 'post': case 'conv': case 'statpost': return stackUse(n.a);
       case 'pow': return mx(stackUse(n.a), plus(stackUse(n.b), 1, 2));
       case 'root': return mx(stackUse(n.n), plus(stackUse(n.x), 1, 2));
       case 'frac': return mx(plus(stackUse(n.a), 0, 1), plus(stackUse(n.b), 1, 1));
