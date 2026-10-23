@@ -303,6 +303,7 @@ sub.ps, sub.e10 { font-size: .6em; vertical-align: -.25em; }
 .lk small { font: 400 10px/1.1 "Segoe UI", sans-serif; color: #8a6d00; }
 .lk.ok { background: #d8efd8; border-color: #7bb27b; color: #1f5f1f; }
 .lk.cur { border-color: #2f5f9a; box-shadow: 0 0 0 2px rgba(47,95,154,.35); }
+.lk.miss { border-color: #b3261e; background: #fde8e6; box-shadow: 0 0 0 2px rgba(179,38,30,.35); }
 .lk-sep { display: none; }
 .ls-hint { padding: 5px 7px; background: #f6f5f1; border-left: 3px solid #b9b5ad; border-radius: 3px; }
 .ls-hint.emph { background: #fff4d6; border-left-color: #e0a800; }

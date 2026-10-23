@@ -78,6 +78,7 @@
     this.refStates = [];     // getState() at the end of each step (debug / QA)
     this.pressed = [];       // keys pressed by the student in the current step
     this.status = 'idle';
+    this.recovered = false;  // true right after DEL fixed a wrong key and the student is back on the key sequence
     this.reason = null;      // wrong: 'order' (left the key sequence) | 'result' (all keys pressed, state differs)
     this.busy = false;       // true while the runner itself presses keys
     this.listeners = [];
@@ -188,6 +189,15 @@
     return true;
   };
 
+  // number of leading keys of the step the student pressed correctly
+  Runner.prototype.matched = function () {
+    var s = this.step();
+    if (!s) return 0;
+    var n = Math.min(this.pressed.length, s.keys.length);
+    for (var i = 0; i < n; i++) if (canon(s.keys[i]) !== this.pressed[i]) return i;
+    return n;
+  };
+
   // next key the student should press (null when it cannot be told)
   Runner.prototype.nextKey = function () {
     if (!this.lesson) return null;
@@ -195,7 +205,10 @@
       var ns = this.lesson.steps[this.stepIdx + 1];
       return ns ? canon(ns.keys[0]) : null;
     }
-    if (this.status === 'done' || !this.onTrack()) return null;
+    if (this.status === 'done') return null;
+    // left the key sequence: DEL takes back the wrong key(s)
+    if (this.status === 'wrong' && this.reason === 'order') return 'DEL';
+    if (!this.onTrack()) return null;
     var s = this.step();
     return this.pressed.length < s.keys.length ? canon(s.keys[this.pressed.length]) : null;
   };
@@ -208,7 +221,14 @@
       this.stepIdx++;
       this.pressed = [];
     }
-    this.pressed.push(name);
+    this.recovered = false;
+    if (name === 'DEL' && this.status === 'wrong' && this.pressed.length) {
+      // DEL after a wrong key: take that key back and judge again from the shorter list
+      this.pressed.pop();
+      this.recovered = this.onTrack();
+    } else {
+      this.pressed.push(name);
+    }
     var s = this.step();
     if (fingerprint(this.calc) === this.refs[this.stepIdx]) {
       this.status = this.stepIdx + 1 >= this.lesson.steps.length ? 'done' : 'correct';
@@ -606,9 +626,12 @@
       q('.ls-stepno').textContent = '단계 ' + (idx + 1) + ' / ' + n;
       var track = runner.onTrack() || runner.status === 'correct' || done;
       var np = runner.status === 'correct' || done ? s.keys.length : runner.pressed.length;
+      var off = !track && runner.status === 'wrong' && runner.reason === 'order';
+      var mt = runner.matched();
       var chips = [];
       for (var i = 0; i < s.keys.length; i++) {
         var cls = track && i < np ? 'ok' : (track && i === np ? 'cur' : '');
+        if (off) cls = i < mt ? 'ok' : (i === mt ? 'cur miss' : '');
         chips.push(chipHTML(s.keys, i, l.mode, cls));
       }
       q('.ls-keys').innerHTML = chips.join('<span class="lk-sep"> </span>');
@@ -619,8 +642,14 @@
       var st = q('.ls-status');
       if (runner.status === 'correct') st.innerHTML = '<span class="good">정답</span> "다음 단계"를 누르거나 다음 키를 바로 누르세요.';
       else if (done) st.innerHTML = '<span class="good">정답, 레슨 완료</span> 다른 레슨을 고르거나 "처음부터"로 다시 연습하세요.';
-      else if (runner.status === 'wrong' && runner.reason === 'order') st.innerHTML = '<span class="bad">안내한 키와 다릅니다.</span> 아래 힌트를 보고 이어서 고치거나 "이 단계 다시"로 다시 시도하세요.';
+      else if (runner.status === 'wrong' && runner.reason === 'order') {
+        var extra = runner.pressed.length - mt, want = s.keys[mt];
+        st.innerHTML = '<span class="bad">' + esc(runner.pressed[runner.pressed.length - 1]) + ' 키는 안내와 다릅니다.</span> ' +
+          '<b>DEL</b>(파란 테두리)로 ' + (extra > 1 ? extra + '개를 지운' : '지운') + ' 뒤 ' + (want ? '<b>' + esc(want) + '</b>를 누르세요.' : '이어서 누르세요.') +
+          ' 어려우면 "이 단계 다시"를 누르세요.';
+      }
       else if (runner.status === 'wrong') st.innerHTML = '<span class="bad">화면이 기대와 다릅니다.</span> 힌트를 보고 "이 단계 다시"로 다시 시도하세요.';
+      else if (runner.recovered) st.innerHTML = '<span class="good">고쳤어요.</span> 다시 안내를 따라가고 있어요. 이어서 누르세요.';
       else st.textContent = runner.pressed.length ? '계속 누르세요.' : '계산기 키패드(또는 키보드)로 위의 키를 차례로 누르세요.';
       q('.ls-next').disabled = runner.status !== 'correct';
       q('.ls-skip').disabled = done;
@@ -652,6 +681,11 @@
       runner.onChange(function () {
         if (runner.lesson && runner.status === 'done' && !done[runner.lesson.id]) { done[runner.lesson.id] = 1; saveDone(done); }
         clearHL(); render(); renderDock();
+        // wrong key: light up DEL on the keypad so the way back is visible
+        if (runner.status === 'wrong' && runner.reason === 'order') {
+          var del = doc.querySelector('.calc [data-key="DEL"]');
+          if (del) { del.classList.add('hint-key'); hlKey = 'DEL'; }
+        }
       });
       calc.onChange(renderDock);
       render();
@@ -789,7 +823,11 @@
       var s = l.steps[Math.min(i, n - 1)];
       var track = runner.onTrack();
       var np = runner.pressed.length;
-      return s.keys.map(function (k, j) { return chipHTML(s.keys, j, l.mode, track && j < np ? 'ok' : (track && j === np ? 'cur' : '')); });
+      var off = !track && runner.status === 'wrong' && runner.reason === 'order', mt = runner.matched();
+      return s.keys.map(function (k, j) {
+        if (off) return chipHTML(s.keys, j, l.mode, j < mt ? 'ok' : (j === mt ? 'cur miss' : ''));
+        return chipHTML(s.keys, j, l.mode, track && j < np ? 'ok' : (track && j === np ? 'cur' : ''));
+      });
     }
     function renderDock() {
       var on = !!(runner && runner.lesson && runner.status !== 'done');
