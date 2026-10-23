@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>공학계산기 시뮬레이터</title>
+<link rel="stylesheet" href="src/ui/style.css">
+</head>
+<body>
+<!-- under 600px shell.js moves the mode switch into this strip (no overlap with the keys) -->
+<div class="shell-bar"><span class="shell-title">공학계산기 시뮬레이터</span></div>
+<div class="page mode-calc" data-mode="calc">
+  <div class="calc" aria-label="공학계산기 시뮬레이터">
+    <div class="brand"><img class="school-logo" src="src/ui/assets/school-logo-engraved.png" alt="한국폴리텍대학 광주캠퍼스"><span class="sim-title"><span>공학계산기</span><span>시뮬레이터</span></span><button type="button" class="mode-switch" role="switch" aria-checked="false" aria-label="레슨 모드" title="계산용 / 레슨용 전환"><span class="ms-pill"><span class="ms-knob" aria-hidden="true"></span><span class="ms-lbl ms-calc">계산</span><span class="ms-lbl ms-lesson">레슨</span></span></button></div>
+    <div class="model">
+      <span class="m1"></span>
+      <span class="m2">Dept. of<br>Mechanical System</span>
+    </div>
+    <div class="lcd-frame">
+      <div class="lcd" role="img" aria-label="display">
+        <div class="lcd-ind"></div>
+        <div class="lcd-in"><div class="lcd-in-inner"></div></div>
+        <div class="lcd-out"><div class="lcd-out-inner"></div></div>
+        <div class="lcd-text"></div>
+        <span class="lcd-scroll-l">◀</span><span class="lcd-scroll-r">▷</span>
+      </div>
+    </div>
+    <div class="kp-top"></div>
+    <div class="kp-fn"></div>
+    <div class="kp-num"></div>
+  </div>
+
+  <div class="side">
+    <h1>공학계산기 시뮬레이터 (COMP, CMPLX, EQN)</h1>
+    <span class="engine-badge"></span>
+    <section class="lesson-panel" aria-label="레슨" hidden></section>
+    <div class="calc-pane">
+    <div class="state-line" aria-live="polite"></div>
+    <h2>키보드</h2>
+    <table>
+      <tr><td><kbd>Shift</kbd> 단독</td><td>SHIFT</td></tr>
+      <tr><td><kbd>Ctrl</kbd> 단독</td><td>ALPHA</td></tr>
+      <tr><td>0-9 . + - * / ( )</td><td>숫자, 연산, 괄호</td></tr>
+      <tr><td><kbd>Enter</kbd> <kbd>=</kbd></td><td>=</td></tr>
+      <tr><td><kbd>Backspace</kbd> <kbd>Del</kbd></td><td>DEL</td></tr>
+      <tr><td><kbd>Insert</kbd></td><td>SHIFT DEL (INS)</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>AC</td></tr>
+      <tr><td>방향키</td><td>▲ ▼ ◀ ▶</td></tr>
+      <tr><td>s c t / l n</td><td>sin cos tan / log ln</td></tr>
+      <tr><td>r q ^ i !</td><td>√ x² x^ x⁻¹ x!</td></tr>
+      <tr><td>f h a k</td><td>분수 hyp Ans ×10^x</td></tr>
+      <tr><td>p e</td><td>π e</td></tr>
+      <tr><td>d g m o</td><td>S⇔D ENG MODE ON</td></tr>
+      <tr><td>% , :</td><td>% , : (SHIFT/ALPHA 조합)</td></tr>
+      <tr><td>~</td><td>(−)</td></tr>
+      <tr><td>A-F M X Y (대문자)</td><td>ALPHA 변수</td></tr>
+      <tr><td>g (CMPLX)</td><td><i>i</i> (ENG 키)</td></tr>
+    </table>
+    <h2>CMPLX 모드</h2>
+    <p>MODE 2로 진입. <i>i</i> = ENG, ∠ = SHIFT (−), Abs = SHIFT hyp, SHIFT 2 = CMPLX 메뉴(1 arg, 2 Conjg, 3 ▶r∠θ, 4 ▶a+b<i>i</i>). 결과 형식은 SHIFT MODE ▼ 3.</p>
+    <h2>EQN 모드</h2>
+    <p>MODE 5로 진입해 방정식 종류(1~4)를 고른다. 계수를 넣고 = 로 다음 칸, 방향키로 칸 이동, AC는 계수 모두 0. 계수를 다 넣은 뒤 = 를 한 번 더 누르면 해가 나오고, = 또는 ▼ ▲로 해 사이를 이동한다. 해 화면의 AC는 계수 편집으로 돌아간다.</p>
+    <h2>노란 글씨 / 빨간 글씨</h2>
+    <p>키 위 노란 글씨는 SHIFT 후, 빨간 글씨는 ALPHA 후 동작합니다. SETUP은 SHIFT MODE.</p>
+    </div>
+  </div>
+</div>
+
+<!-- engine (pure JS, attaches window.CalcEngine). Order: src/engine/README.md -->
+<script src="src/engine/core.js"></script>
+<script src="src/engine/parser.js"></script>
+<script src="src/engine/constants.js"></script>
+<script src="src/engine/evaluator.js"></script>
+<script src="src/engine/format.js"></script>
+<script src="src/engine/api.js"></script>
+<script src="src/engine/eqn.js"></script>
+<!-- UI (plain scripts, no modules, so file:// works) -->
+<script src="src/ui/fallback-engine.js"></script>
+<script src="src/ui/tables.js"></script>
+<script src="src/ui/keys.js"></script>
+<script src="src/ui/editor.js"></script>
+<script src="src/ui/adapter.js"></script>
+<script src="src/ui/calculator.js"></script>
+<script src="src/ui/render.js"></script>
+<script src="src/ui/app.js"></script>
+<!-- lessons: lessons-data.js = file:// copy of src/tutorial/lessons.json (node tests/ui/lessons.check.js --write) -->
+<script src="src/ui/lessons-data.js"></script>
+<script src="src/ui/lessons.js"></script>
+<!-- shell: 계산용 / 레슨용 mode switch (after lessons.js) -->
+<script src="src/ui/shell.js"></script>
+</body>
+</html>

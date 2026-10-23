@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "courses": [
+    {
+      "id": "C1", "title": "기초: 계산기와 친해지기",
+      "units": [
+        { "id": "C1-U1", "title": "처음 만나기", "slides": "4~7" },
+        { "id": "C1-U2", "title": "식 입력과 고치기", "slides": "13~15" },
+        { "id": "C1-U3", "title": "값 저장하기", "slides": "16~17" },
+        { "id": "C1-U4", "title": "분수 계산", "slides": "11, 18" }
+      ]
+    },
+    {
+      "id": "C2", "title": "활용: 측정 실습에서 쓰는 계산",
+      "units": [
+        { "id": "C2-U1", "title": "루트·π·각도", "slides": "7~8, 22" },
+        { "id": "C2-U2", "title": "측정값 표시 정리", "slides": "9~10, 12" },
+        { "id": "C2-U3", "title": "비율과 공차", "slides": "21" },
+        { "id": "C2-U4", "title": "긴 식 입력", "slides": "19~20" }
+      ]
+    },
+    {
+      "id": "C3", "title": "공학 계산: 미적분·복소수·방정식",
+      "units": [
+        { "id": "C3-U1", "title": "미적분과 합", "slides": "23~24" },
+        { "id": "C3-U2", "title": "복소수 (CMPLX)", "slides": "25~26" },
+        { "id": "C3-U3", "title": "방정식 (EQN)", "slides": "27~28" },
+        { "id": "C3-U4", "title": "통계 (STAT) 외 다른 모드", "reserved": true, "note": "준비 중. 다음 구현 모드는 미정이며 STAT을 첫 후보로 둔다(평균·표준편차·회귀). TABLE, BASE-N, MATRIX, VECTOR, SOLVE/CALC도 이 자리에 들어온다." },
+        { "id": "C3-U5", "title": "종합 연습", "slides": "29" }
+      ]
+    }
+  ]
+}

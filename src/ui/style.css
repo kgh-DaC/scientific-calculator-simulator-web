@@ -1,0 +1,377 @@
+/* 공학용계산기 시뮬레이터 - look & feel. Key colours/positions follow _workspace/01_spec_comp.md Part B
+   (positions there are [미확인]; colours are approximations of the black 2nd edition body). */
+* { box-sizing: border-box; }
+/* system fonts only (no web font download) */
+:root { --ko-font: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Noto Sans CJK KR", "Nanum Gothic", sans-serif; }
+/* keep the scrollbar slot so a mode change (panel height) does not shift the centred layout */
+html { scrollbar-gutter: stable; }
+html, body { margin: 0; background: #e9e7e2; font-family: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Noto Sans CJK KR", sans-serif; color: #222; }
+/* same flex slot for the panel in both modes so the calculator (and the switch) never moves on a mode change */
+.page { display: flex; flex-wrap: wrap; gap: 28px; justify-content: flex-start; align-items: flex-start; padding: 24px 12px; max-width: 1284px; margin: 0 auto; }
+
+/* ---------------- body ---------------- */
+.calc {
+  width: 372px; padding: 18px 18px 26px; border-radius: 30px 30px 40px 40px;
+  background: linear-gradient(180deg, #2b2e35 0%, #1c1e23 38%, #17181c 100%);
+  box-shadow: 0 14px 34px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.12), inset 0 -2px 0 rgba(0,0,0,.6);
+  user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+.brand { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px 0; min-height: 34px; }
+.school-logo { height: 64px; width: auto; opacity: .9; filter: drop-shadow(0 1px 0 rgba(255,255,255,.28)) drop-shadow(0 -1px 0 rgba(0,0,0,.85)); }
+[hidden] { display: none !important; }
+
+/* 계산 | 레슨 slide switch in place of the solar panel (src/ui/shell.js). The visible pill is small;
+   the button around it keeps a 44px touch target. */
+.mode-switch { flex: none; display: flex; align-items: center; justify-content: center; min-width: 116px; min-height: 44px;
+  margin: -5px -4px -5px 0; padding: 0 4px; border: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.mode-switch:focus { outline: none; }
+.mode-switch:focus-visible .ms-pill { outline: 2px solid #6aa0ff; outline-offset: 2px; }
+.ms-pill { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: 108px; height: 26px; border-radius: 13px;
+  background: #121214; box-shadow: inset 0 1px 3px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.14); overflow: hidden; }
+.ms-knob { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px); border-radius: 11px;
+  background: linear-gradient(180deg, #e9eaee, #b9bcc3); box-shadow: 0 1px 2px rgba(0,0,0,.6), inset 0 1px 0 #fff;
+  transition: transform .18s ease, background .18s ease; }
+.ms-lbl { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center;
+  font: 700 12px/1 var(--ko-font); color: #8f949c; transition: color .18s ease; pointer-events: none; }
+/* state from the switch itself: it may sit outside .page (.shell-bar under 600px) */
+.mode-switch[aria-checked="false"] .ms-calc { color: #16171a; }
+.mode-switch[aria-checked="true"] .ms-knob { transform: translateX(100%); background: linear-gradient(180deg, #7fb4ec, #3f74b8); box-shadow: 0 1px 2px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.55); }
+.mode-switch[aria-checked="true"] .ms-lesson { color: #fff; }
+@media (prefers-reduced-motion: reduce) { .ms-knob, .ms-lbl { transition: none; } }
+.model { display: flex; justify-content: flex-end; align-items: baseline; padding: 4px 8px 8px; color: #cfd2d8; }
+.model .m1 { font: 700 14px/1 var(--ko-font); letter-spacing: 1px; color: #b9bdc5; text-shadow: 0 1px 0 rgba(255,255,255,.22), 0 -1px 0 rgba(0,0,0,.85); }
+.model .m1 b { font-weight: 700; color: #e6e8ec; }
+.sim-title { flex: 1; display: flex; flex-direction: column; margin: 0 8px 0 10px; font: 800 17px/1.2 var(--ko-font); letter-spacing: -.5px; color: #b9bdc5; text-shadow: 0 1px 0 rgba(255,255,255,.22), 0 -1px 0 rgba(0,0,0,.85); }
+.model .m2 { font: 700 10px/1.3 Arial, sans-serif; letter-spacing: 1px; color: #b9bdc5; text-align: right; text-shadow: 0 1px 0 rgba(255,255,255,.22), 0 -1px 0 rgba(0,0,0,.85); }
+.model .m2 small { display: block; font-weight: 400; font-style: italic; margin-top: 2px; color: #8f949c; }
+
+/* ---------------- LCD ---------------- */
+.lcd-frame { padding: 9px; border-radius: 10px; background: #0f1012; box-shadow: inset 0 2px 5px rgba(0,0,0,.8); margin: 0 2px 16px; }
+/* 11차: ink darker (default contrast 5 -> alpha .95), LCD background a little lighter, dot grid moved
+   BEHIND the ink (it used to be drawn over the glyphs and cut every 3rd pixel row/column out of them),
+   bold LCD font. Contrast ink : background >= 9:1 at the default contrast setting. */
+.lcd {
+  --ink-alpha: .95;
+  --ink: rgba(10, 14, 8, var(--ink-alpha));
+  position: relative; height: 118px; border-radius: 3px; overflow: hidden;
+  background:
+    repeating-linear-gradient(90deg, rgba(150,163,128,.16) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg, rgba(150,163,128,.16) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #ccd5bb, #bcc6aa);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.35);
+  color: var(--ink);
+  font-family: "Consolas", "Lucida Console", "DejaVu Sans Mono", monospace;
+  font-weight: 700;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+}
+.lcd-ind { position: absolute; left: 4px; right: 4px; top: 2px; height: 12px; display: flex; gap: 0; justify-content: space-between;
+  font: 700 9.5px/12px Arial, "Segoe UI", sans-serif; letter-spacing: -.2px; }
+.ind { visibility: hidden; padding: 0 1px; }
+.ind.on { visibility: visible; }
+.ind-S { color: var(--ink); }
+.lcd-in { position: absolute; left: 6px; right: 6px; top: 15px; height: 52px; overflow: hidden; display: flex; align-items: center; }
+.lcd-in-inner { display: inline-block; white-space: nowrap; font-size: 21px; line-height: 1; transition: none; }
+.lcd-out { position: absolute; left: 6px; right: 6px; bottom: 2px; height: 52px; overflow: hidden; display: flex; align-items: center; justify-content: flex-end; }
+.lcd-out-inner { display: inline-block; white-space: nowrap; font-size: 26px; line-height: 1; }
+.lcd-res-line .lcd-out-inner { font-size: 24px; }
+/* result line is 52px high (bottom 2px, may overlap the empty bottom edge of the input line): a two-level fraction must fit (2 x 1.0 line + bar + padding) */
+.lcd-out .frac { font-size: .78em; }
+.lcd-in .frac { font-size: .9em; }
+.lcd-out .frac > .fn, .lcd-out .frac > .fd, .lcd-in .frac > .fn, .lcd-in .frac > .fd { line-height: 1; }
+.lcd-out .frac .frac { font-size: .85em; }
+.lcd-text { position: absolute; left: 6px; right: 6px; top: 16px; bottom: 4px; font-size: 17px; line-height: 24px; white-space: pre; overflow: hidden; }
+.lcd-text:empty { display: none; }
+.lcd-scroll-l, .lcd-scroll-r { position: absolute; top: 33px; font-size: 11px; color: var(--ink); visibility: hidden; }
+.lcd-scroll-l { left: 0; } .lcd-scroll-r { right: 0; }
+.lcd-scroll-l.on, .lcd-scroll-r.on { visibility: visible; }
+.lcd-off .lcd-in, .lcd-off .lcd-out, .lcd-off .lcd-ind { visibility: hidden; }
+
+/* solve result rows */
+.lcd-kind-solve .lcd-out { height: 50px; align-items: stretch; }
+.lcd-kind-solve .lcd-out-inner { display: flex; flex-direction: column; width: 100%; font-size: 17px; }
+.srow { display: flex; justify-content: space-between; line-height: 24px; }
+
+/* EQN coefficient screen (EQN_2.png / EQN_3.png) */
+.lcd-eqn-edit .lcd-text { top: 13px; white-space: nowrap; font-size: 13px; line-height: 1; }
+.eqg { display: flex; flex-direction: column; gap: 1px; padding-right: 8px; }
+.eqr { display: flex; align-items: center; height: 18px; }
+.eqr.eqh { height: 11px; font: 700 10px/11px Arial, sans-serif; }
+.eqn-no { width: 12px; flex: none; font-size: 9px; border-right: 1px solid var(--ink); align-self: stretch; display: flex; align-items: center; }
+.eqh .eqn-no { border-right: 0; }
+.eqc { flex: 1; min-width: 0; display: flex; justify-content: flex-end; align-items: center; padding: 0 3px; overflow: hidden; height: 100%; }
+.eqh .eqc { justify-content: center; }
+.eqc.sel { background: var(--ink); color: #c0caae; }
+.eqv { font-size: 14px; white-space: nowrap; }
+.eqv .t.frac { font-size: 8px; }
+.eqb { position: absolute; right: 0; bottom: 0; font-size: 18px; white-space: nowrap; max-width: 100%; overflow: hidden; display: flex; justify-content: flex-end; }
+
+/* CMPLX result rows (LineIO/LineO: a and bi / r and ∠θ on separate rows) */
+.lcd-rows .lcd-out { height: 50px; align-items: stretch; }
+.lcd-rows .lcd-out-inner { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; width: 100%; font-size: 18px; }
+.rrow { display: block; line-height: 24px; white-space: nowrap; }
+.im { font-style: italic; font-family: "Times New Roman", serif; }
+.cmd { font-size: .9em; }
+
+/* ---- expression / result typesetting ---- */
+.a { display: inline-block; vertical-align: middle; }
+.t { display: inline-flex; align-items: center; vertical-align: middle; }
+.slot { display: inline-block; white-space: nowrap; vertical-align: middle; min-height: .9em; }
+.slot.empty { width: .62em; height: .86em; border: 1px dotted var(--ink); position: relative; margin: 0 1px; }
+.lcd .slot.empty .cur, .ld-scr .slot.empty .cur { position: absolute; left: 1px; top: 0; height: 100%; }
+.frac { flex-direction: column; margin: 0 2px; }
+.frac > .fn, .frac > .fd { display: block; text-align: center; padding: 0 2px; line-height: 1.05; }
+.frac > .fn { border-bottom: 2px solid var(--ink); padding-bottom: 1px; }
+.frac > .fd { padding-top: 1px; }
+.frac.sm { font-size: .6em; }
+.mixed { gap: 1px; }
+.sqrt { align-items: flex-end; }
+.sqrt .rad { font-size: 1.1em; line-height: 1; margin-right: -1px; }
+.sqrt .rc { border-top: 2px solid var(--ink); padding: 1px 1px 0 2px; }
+.sqrt .ri { font-size: .6em; align-self: flex-start; margin-right: -3px; }
+sup.pow { font-size: .72em; align-self: flex-start; vertical-align: .55em; margin-left: 1px; display: inline-flex; }
+sup.ps { font-size: .65em; vertical-align: .55em; }
+sub.ps, sub.e10 { font-size: .6em; vertical-align: -.25em; }
+.logb .lb { font-size: .7em; vertical-align: -.35em; align-self: flex-end; }
+.abs { border-left: 2px solid var(--ink); border-right: 2px solid var(--ink); padding: 0 2px; margin: 0 1px; }
+.big .bigsym { font-size: 1.5em; line-height: 1; }
+.big .lim, .big .lim2 { display: inline-flex; flex-direction: column; font-size: .6em; line-height: 1.05; }
+.big .lim { justify-content: space-between; height: 2.2em; margin-right: 2px; }
+.big .lim2 { align-items: center; margin-right: 1px; }
+.big .lim2 .bigsym.s { font-size: 2.2em; }
+.big .dx { font-style: normal; margin-left: 2px; }
+.deriv .at sub { font-size: .65em; }
+.ee { font-style: italic; }
+.pc { font-weight: 700; font-size: .9em; }
+.fsep { display: inline-block; transform: scale(.9); }
+.cst, .cnv { font-size: .85em; }
+
+/* cursor */
+/* LCD only: lesson panel uses .cur for "current" (.ls-item.cur, .lk.cur), which must not blink */
+.lcd .cur, .ld-scr .cur { display: inline-block; vertical-align: middle; animation: blink 1s steps(1) infinite; }
+.lcd .cur.bar, .lcd .cur.under, .ld-scr .cur.bar, .ld-scr .cur.under { width: 0; height: 1em; position: relative; }
+.lcd .cur.bar::before, .ld-scr .cur.bar::before { content: ""; position: absolute; left: -1px; top: 0; width: 2px; height: 100%; background: var(--ink); }
+.lcd .cur.under::before, .ld-scr .cur.under::before { content: ""; position: absolute; left: 0; bottom: -1px; width: .6em; height: 2px; background: var(--ink); }
+.lcd .cur.full, .lcd .cur.block, .ld-scr .cur.full, .ld-scr .cur.block { width: .55em; height: 1em; background: var(--ink); }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------------- keypad ---------------- */
+.kp-top, .kp-fn, .kp-num { display: grid; column-gap: 9px; }
+.kp-top { grid-template-columns: repeat(6, 1fr); grid-template-rows: 46px 46px; row-gap: 2px; margin-bottom: 6px; }
+.kp-fn { grid-template-columns: repeat(6, 1fr); grid-auto-rows: 46px; row-gap: 2px; margin-bottom: 12px; }
+.kp-num { grid-template-columns: repeat(5, 1fr); grid-auto-rows: 54px; row-gap: 4px; column-gap: 10px; }
+.kw { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; min-width: 0; }
+.leg { height: 15px; display: flex; justify-content: center; align-items: flex-end; gap: 3px; font: 700 9px/1 Arial, sans-serif; white-space: nowrap; overflow: visible; }
+.leg.both { justify-content: space-between; }
+.lg-s { color: #f0c52b; }
+.lg-a { color: #ef4b45; }
+.lg-c { color: #8fa3ff; }   /* CMPLX-mode legend (ENG = i) */
+.leg sup, .leg sub { font-size: 7px; line-height: 0; }
+.leg .bx { width: 6px; height: 7px; }
+
+.key {
+  width: 100%; height: 27px; padding: 0; border: 0; border-radius: 8px; cursor: pointer;
+  font: 600 12px/1 Arial, sans-serif; color: #f3f4f6;
+  background: linear-gradient(180deg, #4a4d55, #34363c);
+  box-shadow: 0 2px 0 #0b0b0d, 0 3px 4px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.18);
+  display: flex; align-items: center; justify-content: center; position: relative; top: 0;
+}
+.key:focus { outline: none; }
+.key:focus-visible { outline: 2px solid #6aa0ff; }
+.key.pressed, .pk.pressed { top: 2px; box-shadow: 0 0 0 #0b0b0d, 0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.1); filter: brightness(.9); }
+.cap { display: inline-flex; align-items: center; pointer-events: none; }
+.cap sup { font-size: 8px; vertical-align: 5px; line-height: 0; }
+.cap sub { font-size: 8px; line-height: 0; }
+.xv { font-style: italic; font-family: "Times New Roman", serif; font-size: 14px; }
+.k-top { height: 22px; border-radius: 11px; font-size: 10.5px; background: linear-gradient(180deg, #3f4249, #2c2e33); }
+.k-shift .cap { color: #f0c52b; }
+.k-alpha .cap { color: #ef4b45; }
+.k-on .cap { color: #f3f4f6; }
+.k-fn { height: 27px; }
+.k-num { height: 34px; border-radius: 7px; font-size: 18px; font-weight: 700; color: #16171a;
+  background: linear-gradient(180deg, #e9eaee, #c9cbd1); box-shadow: 0 2px 0 #55575d, 0 3px 4px rgba(0,0,0,.5), inset 0 1px 0 #fff; }
+.k-num .cap sup { font-size: 10px; }
+.k-op { font-size: 20px; }
+.k-del { color: #fff; background: linear-gradient(180deg, #4f86c6, #2f5f9a); box-shadow: 0 2px 0 #1b3150, 0 3px 4px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.35); font-size: 15px; }
+.k-num[data-key="="] { font-size: 20px; }
+
+/* key-cap icons */
+.bx { display: inline-block; width: 7px; height: 8px; border: 1px solid currentColor; vertical-align: middle; }
+.bx.f { background: currentColor; }
+.ic-frac { display: inline-flex; flex-direction: column; align-items: center; line-height: 0; gap: 1px; }
+.ic-frac .bar { display: block; width: 10px; height: 1px; background: currentColor; }
+.ic-frac.sm .bx { width: 5px; height: 5px; } .ic-frac.sm .bar { width: 7px; }
+.ic-mixed { display: inline-flex; align-items: center; gap: 1px; }
+.ic-mixed.sm .bx { width: 5px; height: 5px; }
+.ic-int { display: inline-flex; align-items: center; font-size: 14px; gap: 1px; }
+.ddx { font-size: 7px; }
+
+/* replay pad */
+.pad { grid-column: 3 / 5; grid-row: 1 / 3; position: relative; margin: 2px 4px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #50535b, #2c2e33 70%); box-shadow: 0 3px 0 #0b0b0d, 0 4px 6px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.2); }
+.pk { position: absolute; border: 0; background: transparent; color: #dfe2e7; cursor: pointer; font-size: 10px; padding: 0; border-radius: 6px; }
+.pk:hover { background: rgba(255,255,255,.08); }
+.pk-up { left: 30%; right: 30%; top: 0; height: 32%; }
+.pk-down { left: 30%; right: 30%; bottom: 0; height: 32%; }
+.pk-left { top: 30%; bottom: 30%; left: 0; width: 30%; }
+.pk-right { top: 30%; bottom: 30%; right: 0; width: 30%; }
+.pk.pressed { top: auto; }
+.pk-up.pressed { top: 2px; } .pk-down.pressed { bottom: -2px; } .pk-left.pressed { left: 2px; } .pk-right.pressed { right: -2px; }
+.pad-c { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font: 700 7px/1 Arial, sans-serif; letter-spacing: .5px; color: #9ea3ab; pointer-events: none; }
+
+/* ---------------- side panel ---------------- */
+.side { width: 360px; font-size: 13px; line-height: 1.55; }
+.side h1 { font-size: 18px; margin: 0 0 6px; }
+.side h2 { font-size: 14px; margin: 16px 0 4px; }
+.side table { border-collapse: collapse; width: 100%; }
+.side td { padding: 1px 4px; border-bottom: 1px solid #d6d3cc; vertical-align: top; }
+.side td:first-child { white-space: nowrap; font-family: Consolas, monospace; color: #444; }
+.side kbd { font-family: Consolas, monospace; background: #fff; border: 1px solid #bbb; border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; font-size: 12px; }
+.engine-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+.engine-badge.real { background: #d8efd8; color: #1f5f1f; }
+.engine-badge.fb { background: #fbe6c8; color: #7a4b05; }
+.state-line { margin-top: 10px; font: 12px/1.4 Consolas, monospace; background: #f6f5f1; border: 1px solid #d6d3cc; padding: 6px; border-radius: 4px; word-break: break-all; min-height: 2.8em; }
+
+/* ---------------- lesson panel (src/ui/lessons.js) ---------------- */
+/* lesson mode: two separate areas, table of contents (narrow) | follow-along (wide) */
+.lesson-panel { margin-top: 10px; display: grid; grid-template-columns: minmax(190px, 36%) minmax(0, 1fr); gap: 12px; align-items: start; }
+.ls-toc-pane, .ls-follow { min-width: 0; padding: 8px 10px 10px; background: #fff; border: 1px solid #d6d3cc; border-radius: 6px; }
+.ls-toc-pane { position: sticky; top: 8px; }
+.lesson-panel h2 { margin: 0 0 6px; }
+.ls-warn { grid-column: 1 / -1; }
+.ls-empty p { margin: 0 0 8px; color: #555; }
+.ls-toc-toggle { display: none; }
+/* table of contents: lessons grouped by mode, scrolls inside its own area */
+.ls-toc { max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+.ls-grp h3 { position: sticky; top: 0; z-index: 1; margin: 6px 0 2px; padding: 3px 2px; background: #fff; border-bottom: 1px solid #e3e0d9; font-size: 13px; color: #2f5f9a; }
+.ls-grp h3 small { font-weight: 400; color: #777; }
+.ls-cnt { float: right; font-weight: 400; font-size: 11px; color: #888; }
+.ls-grp ol, .ls-unit ol { list-style: none; margin: 0; padding: 0; }
+/* 3-level table of contents (toc.json): course (sticky) -> unit -> lesson */
+.ls-course h3 { position: sticky; top: 0; z-index: 1; margin: 8px 0 2px; padding: 4px 2px; background: #fff; border-bottom: 1px solid #e3e0d9; font-size: 13px; color: #2f5f9a; }
+.ls-unit h4 { margin: 6px 0 1px; padding: 2px; font-size: 12.5px; color: #333; }
+.ls-uno { color: #888; font-weight: 400; margin-right: 2px; }
+.ls-unit .ls-cnt { float: right; font-weight: 400; font-size: 11px; color: #888; }
+.ls-reserved h4 { color: #888; font-weight: 400; }
+.ls-soon { display: inline-block; margin-left: 4px; padding: 0 6px; border: 1px solid #ccc; border-radius: 9px; font-size: 11px; color: #777; }
+.ls-note { margin: 0 0 4px 2px; font-size: 11px; color: #888; }
+.ls-badge, .ls-kind { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 8px; font-size: 10.5px; font-weight: 400; vertical-align: 1px; }
+.ls-badge { background: #fbe6c8; color: #7a4b05; }
+.ls-kind { background: #e3ecf7; color: #2f5f9a; }
+
+/* bottom dock (lessons.js): under 600px while a lesson runs. Next keys + calculator line. */
+.ls-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 5px 8px calc(5px + env(safe-area-inset-bottom, 0px));
+  background: #1c1e23; color: #e6e8ec; box-shadow: 0 -2px 8px rgba(0,0,0,.35); font-size: 12px; }
+.ld-row { display: flex; align-items: center; gap: 6px; min-height: 30px; }
+.ld-lbl { flex: none; width: 3.6em; font-size: 11px; color: #9ea3ab; }
+.ld-keys { flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; padding: 2px 0; }
+.ld-keys .lk { flex: none; color: #222; }
+.ld-keys .lk small { display: none; }
+/* "화면": render.js natural notation on an LCD-coloured strip (one line, fractions two levels high) */
+.ld-scr { --ink: rgba(10, 14, 8, .95); flex: 1; min-width: 0; min-height: 34px; display: flex; align-items: center; overflow: hidden; white-space: nowrap;
+  font: 700 15px/1 Consolas, "Lucida Console", "DejaVu Sans Mono", "Malgun Gothic", monospace; background: #c4cdb2; color: var(--ink); border-radius: 3px; padding: 2px 6px; }
+.ld-in { flex: none; display: inline-flex; align-items: center; white-space: nowrap; }
+.ld-scr .frac { font-size: .82em; }
+.ld-scr .frac > .fn { border-bottom-width: 1px; }
+.ld-scr .sqrt .rc { border-top-width: 1px; }
+.ld-lab { margin-right: 6px; font-weight: 700; }
+.ld-arrow { margin: 0 6px; color: #4b5540; }
+.ld-sep { margin: 0 3px; }
+.ld-text { font-size: 13px; }
+.ld-t + .ld-t { margin-left: .9em; }
+@media (min-width: 600px) { .ls-dock { display: none !important; } }
+.ls-item { display: flex; align-items: center; min-height: 44px; gap: 6px; width: 100%; text-align: left; font: inherit; font-size: 13px; padding: 5px 4px; border: 0; border-radius: 4px; background: none; color: #222; cursor: pointer; }
+.ls-item:hover, .ls-item:focus-visible { background: #f0eee8; outline: none; }
+.ls-item.cur { background: #e3ecf7; box-shadow: inset 3px 0 0 #2f5f9a; font-weight: 700; }
+.ls-no { flex: none; min-width: 1.8em; text-align: right; color: #999; font-size: 11px; font-variant-numeric: tabular-nums; }
+[data-kind="tree"] .ls-no { min-width: 3.6em; text-align: left; }
+.ls-name { flex: 1; min-width: 0; }
+.ls-n { flex: none; font-size: 11px; color: #777; }
+.ls-chk { flex: none; width: 1em; color: #1f7a1f; font-weight: 700; }
+.ls-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ls-pos { font-size: 11px; color: #777; }
+.ls-btn { min-height: 44px; font: inherit; font-size: 12px; padding: 4px 12px; border: 1px solid #b9b5ad; border-radius: 4px; background: #f6f5f1; color: #222; cursor: pointer; }
+.ls-btn:hover:not(:disabled) { background: #ecebe6; }
+.ls-btn:disabled { opacity: .45; cursor: default; }
+.ls-btn.primary:not(:disabled) { background: #2f5f9a; border-color: #2f5f9a; color: #fff; }
+.ls-body { margin-top: 8px; }
+.ls-title { font-weight: 700; font-size: 14px; }
+.ls-goal { color: #555; margin: 2px 0 6px; }
+.ls-stepno { font-weight: 700; color: #2f5f9a; }
+.ls-keys { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+.lk { display: inline-flex; flex-direction: column; align-items: center; min-width: 26px; padding: 2px 6px; border: 1px solid #aaa; border-bottom-width: 2px; border-radius: 4px; background: #fafafa; font: 600 13px/1.25 Consolas, "Malgun Gothic", monospace; }
+.lk small { font: 400 10px/1.1 "Segoe UI", sans-serif; color: #8a6d00; }
+.lk.ok { background: #d8efd8; border-color: #7bb27b; color: #1f5f1f; }
+.lk.cur { border-color: #2f5f9a; box-shadow: 0 0 0 2px rgba(47,95,154,.35); }
+.lk-sep { display: none; }
+.ls-hint { padding: 5px 7px; background: #f6f5f1; border-left: 3px solid #b9b5ad; border-radius: 3px; }
+.ls-hint.emph { background: #fff4d6; border-left-color: #e0a800; }
+.ls-expect { margin: 6px 0 2px; }
+.ls-status { min-height: 1.6em; margin: 4px 0; }
+.ls-status .good { font-weight: 700; color: #1f7a1f; }
+.ls-status .bad { font-weight: 700; color: #b3261e; }
+.ls-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.ls-pit { margin-top: 8px; }
+.ls-pit summary { cursor: pointer; font-weight: 700; line-height: 20px; padding: 12px 0; }
+.ls-pit ul { margin: 4px 0 0; padding-left: 18px; }
+.ls-warn { color: #b3261e; font-size: 12px; }
+.ls-warn:empty { display: none; }
+/* "키 보여주기": next key on the keypad */
+.key.hint-key, .pk.hint-key { outline: 3px solid #36c3ff; outline-offset: 2px; animation: hintpulse 1s ease-in-out infinite; z-index: 1; }
+@keyframes hintpulse { 50% { outline-color: rgba(54,195,255,.25); } }
+
+/* ---------------- layout by width (calc-ui-shell 반응형 기준) ---------------- */
+.calc { max-width: 100%; }
+.side { min-width: 0; }
+.side .calc-pane table { table-layout: auto; }
+.side td { overflow-wrap: anywhere; }
+/* 1000px and up: calculator left, panel right; lesson panel = toc | follow side by side */
+.side { width: auto; flex: 1 1 560px; max-width: 860px; }
+.calc-pane, .mode-calc .side > h1 { max-width: 480px; }
+/* 1000-1199px: wider toc so lesson titles do not fold into 3-5 lines */
+@media (min-width: 1000px) and (max-width: 1199px) {
+  .page { gap: 16px; }
+  .lesson-panel { grid-template-columns: minmax(250px, 42%) minmax(0, 1fr); gap: 10px; }
+  .ls-toc-pane, .ls-follow { padding: 8px 8px 10px; }
+  .ls-item { font-size: 12.5px; gap: 4px; }
+  .ls-n { display: none; }
+}
+
+/* 600-999px: calculator on top, panel below; lesson areas stacked (follow first, toc foldable) */
+@media (max-width: 999px) {
+  .page { flex-direction: column; align-items: center; gap: 16px; padding: 12px 6px; }
+  .page { justify-content: center; }
+  .side, .mode-lesson .side { width: 100%; max-width: 640px; flex: none; }
+  .mode-calc .side { max-width: 480px; }
+  .mode-lesson .side h1, .mode-lesson .side .engine-badge:empty { display: none; }
+  .lesson-panel { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+  .ls-follow { order: 1; }
+  .ls-toc-pane { order: 2; position: static; }
+  .ls-warn { order: 3; }
+  .ls-toc-head { display: none; }
+  .ls-toc-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 4px 6px; border: 0; border-radius: 4px;
+    background: none; font: inherit; color: #222; text-align: left; cursor: pointer; }
+  .ls-toc-toggle:hover, .ls-toc-toggle:focus-visible { background: #f0eee8; outline: none; }
+  .ls-toc-lbl { flex: none; font-weight: 700; font-size: 14px; }
+  .ls-toc-cur { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #2f5f9a; }
+  .ls-toc-arrow { flex: none; transition: transform .15s ease; }
+  .ls-toc-pane.open .ls-toc-arrow { transform: rotate(180deg); }
+  .ls-toc-pane:not(.open) .ls-toc { display: none; }
+  .ls-toc { max-height: 55vh; }
+}
+
+/* under 600px: one column. The switch moves (shell.js) into its own opaque strip at the top of the
+   screen (sticky). The strip takes its own space, so the switch never lies over calculator keys. */
+.shell-bar { display: none; }
+@media (max-width: 599px) {
+  .shell-bar { display: flex; position: sticky; top: 0; z-index: 50; align-items: center; justify-content: space-between; gap: 8px;
+    min-height: 52px; padding: 4px 6px 4px 12px; background: #1c1e23; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+  .shell-title { font: 700 14px/1.2 var(--ko-font); color: #cfd2d8; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .shell-bar .mode-switch { margin: 0; }
+  .brand { justify-content: flex-start; }
+  /* scrollIntoView targets stay below the strip */
+  .ls-follow, .ls-toc-pane { scroll-margin-top: 60px; }
+}
+@media (max-width: 390px) {
+  .calc { width: 100%; padding: 14px 10px 20px; }
+}
