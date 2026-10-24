@@ -130,3 +130,14 @@ memory = { ans: Value, vars: { A, B, C, D, E, F, M, X, Y } }   // Value = 엔진
 
 예: CX-01 `(2+6i)÷(2i)` → `paren (, num 2, op +, num 6, imag, paren ), op /, paren (, num 2, imag, paren )`
 CX-09 `√2+√2i▶r∠θ` (MathO) → `tpl sqrt[2], op +, tpl sqrt[2], imag, cmd polar`
+
+## 7. BASE-N 모드 토큰 (`CalcEngine.evaluateBase` 전용, 계약: `_workspace/02_engine_changes.md` BASE-N 절)
+
+| type | 필드 | 의미 / 대응 키 |
+|---|---|---|
+| `num` | `value`: `0-9`, `A-F`(대소문자 무관) | 숫자. 연속 `num`은 이어 붙인다. HEX에서 `(−)` `°′″` `hyp` `sin` `cos` `tan` 키는 `num 'A'..'F'`로 보낸다(`var A` 아님). `.`은 Syntax ERROR |
+| `radix` | `value: 'd'\|'h'\|'b'\|'o'` | `SHIFT 3 ▼ 1~4` n진 기호. 바로 뒤 숫자 리터럴의 진법 지정 |
+| `op` | `value: '+','-','*','/','and','or','xor','xnor'` (`×÷−` 별칭 허용) | 이항 연산자 |
+| `fn` | `name: 'not'\|'neg'` | `Not(` `Neg(` (여는 괄호 포함, `)`로 닫음, 끝이면 생략 가능) |
+| `neg` | — | 부호 `(−)` (HEX 이외. op `'-'`를 피연산자 자리에 써도 같음) |
+| `paren`, `ans`, `var` | | COMP와 같음 |

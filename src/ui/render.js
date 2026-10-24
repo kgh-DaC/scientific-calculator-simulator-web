@@ -33,7 +33,12 @@
     'RanInt#(': 'RanInt#(',
     // CMPLX
     'i': '<i class="im">i</i>', '∠': '∠',
-    '▶r∠θ': '<span class="cmd">▶r∠θ</span>', '▶a+bi': '<span class="cmd">▶a+b<i class="im">i</i></span>'
+    '▶r∠θ': '<span class="cmd">▶r∠θ</span>', '▶a+bi': '<span class="cmd">▶a+b<i class="im">i</i></span>',
+    // BASE-N (SHIFT 3): logical operators, Not( Neg(; prefixes d h b o drawn small before the number
+    'and': '<span class="bop">and</span>', 'or': '<span class="bop">or</span>', 'xor': '<span class="bop">xor</span>',
+    'xnor': '<span class="bop">xnor</span>',
+    'rdx:d': '<span class="rdx">d</span>', 'rdx:h': '<span class="rdx">h</span>', 'rdx:b': '<span class="rdx">b</span>',
+    'rdx:o': '<span class="rdx">o</span>'
   };
 
   function atomHTML(id) {
@@ -41,6 +46,7 @@
     if (id.indexOf('const:') === 0) return '<span class="cst">' + esc(FX.Tables.constSymbol(id.slice(6))) + '</span>';
     if (id.indexOf('conv:') === 0) return '<span class="cnv">' + esc(FX.Tables.convLabel(id.slice(5))) + '</span>';
     if (id.indexOf('lbl:') === 0) return esc(id.slice(4));
+    if (id.indexOf('hx:') === 0) return esc(id.slice(3));          // BASE-N hex digit A~F
     if (/^(st|sp|sf):/.test(id) && FX.StatLabels) return FX.StatLabels.html(id);
     return esc(id);
   }
@@ -197,11 +203,20 @@
     this.scrollL = root.querySelector('.lcd-scroll-l');
     this.scrollR = root.querySelector('.lcd-scroll-r');
     this.scrollX = 0;
+    // BASE-N number base label (Dec Hex Bin Oct), top right of the dot area (manual 53쪽 screens)
+    this.baseEl = root.querySelector('.lcd-base');
+    if (!this.baseEl && root.ownerDocument) {
+      this.baseEl = root.ownerDocument.createElement('span');
+      this.baseEl.className = 'lcd-base';
+      root.appendChild(this.baseEl);
+    }
   }
 
   Renderer.prototype.render = function (sc) {
     var r = this.root;
-    r.className = r.className.replace(/\s*lcd-(off|kind-\w+|line|math|res-line|rows|eqn-edit|table)\b/g, '');
+    r.className = r.className.replace(/\s*lcd-(off|kind-\w+|line|math|res-line|rows|eqn-edit|table|basen)\b/g, '');
+    if (this.baseEl) this.baseEl.textContent = sc.power && sc.baseLabel ? sc.baseLabel : '';
+    if (sc.power && sc.baseLabel) r.className += ' lcd-basen';
     // CONTRAST setting 0..10: default 5 -> .95 (11차: darker ink), 0 -> .70, 9..10 -> 1
     r.style.setProperty('--ink-alpha', String(Math.min(1, 0.70 + (sc.contrast == null ? 5 : sc.contrast) * 0.05)));
     if (!sc.power) {
@@ -220,6 +235,7 @@
       case 'input':
         inHTML = rowHTML(sc.expr, [], { cursor: sc.cursor, lineMode: sc.lineMode }, false);
         if (!sc.expr.length && sc.cursor) inHTML = CURSOR.replace('cur"', 'cur ' + sc.cursor.style + '"');
+        if (sc.baseZero) { outHTML = nodeHTML(sc.baseZero); r.className += ' lcd-res-line'; }   // BASE-N: 0 of the base
         break;
       case 'result':
         inHTML = rowHTML(sc.expr || [], [], { cursor: null, lineMode: sc.lineMode }, false);

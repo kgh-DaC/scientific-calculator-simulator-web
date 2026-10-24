@@ -32,7 +32,7 @@
   </div>
 
   <div class="side">
-    <h1>공학계산기 시뮬레이터 (COMP, CMPLX, STAT, EQN, TABLE)</h1>
+    <h1>공학계산기 시뮬레이터 (COMP, CMPLX, STAT, BASE-N, EQN, TABLE)</h1>
     <span class="engine-badge"></span>
     <section class="lesson-panel" aria-label="레슨" hidden></section>
     <div class="calc-pane">
@@ -63,6 +63,8 @@
     <p>MODE 5로 진입해 방정식 종류(1~4)를 고른다. 계수를 넣고 = 로 다음 칸, 방향키로 칸 이동, AC는 계수 모두 0. 계수를 다 넣은 뒤 = 를 한 번 더 누르면 해가 나오고, = 또는 ▼ ▲로 해 사이를 이동한다. 해 화면의 AC는 계수 편집으로 돌아간다.</p>
     <h2>TABLE 모드</h2>
     <p>MODE 7로 진입. f(X)=에 X(ALPHA ))가 들어간 식을 넣고 = → Start? End? Step?(처음 값 1, 5, 1)마다 값을 넣고 = (그냥 = 는 보이는 값 사용). 표는 ▲▼ ◀▶로 이동하고 아래 줄에 고른 칸 값이 나온다. X 값이 30개를 넘으면 Insufficient MEM. 표에서 AC는 f(X)= 로 돌아간다.</p>
+    <h2>BASE-N 모드</h2>
+    <p>MODE 4로 진입(처음은 10진 Dec). 진법 키: x² = DEC, x^ = HEX, log = BIN, ln = OCT. 16진 숫자 A~F = (−) °′″ hyp sin cos tan. SHIFT 3 = 논리 메뉴(1 and, 2 or, 3 xor, 4 xnor, 5 Not, 6 Neg), ▼ 뒤 1~4 = 진법 기호 d h b o. 결과가 나온 뒤 진법 키를 누르면 같은 값을 그 진법으로 바꿔 보여 준다. 결과는 HEX 8자리, BIN 16자리, OCT 11자리로 앞을 0으로 채운다. 나눗셈의 소수부는 버린다.</p>
     <h2>노란 글씨 / 빨간 글씨</h2>
     <p>키 위 노란 글씨는 SHIFT 후, 빨간 글씨는 ALPHA 후 동작합니다. SETUP은 SHIFT MODE.</p>
     </div>
@@ -79,6 +81,7 @@
 <script src="src/engine/eqn.js"></script>
 <script src="src/engine/stat.js"></script>
 <script src="src/engine/table.js"></script>
+<script src="src/engine/basen.js"></script>
 <!-- UI (plain scripts, no modules, so file:// works) -->
 <script src="src/ui/fallback-engine.js"></script>
 <script src="src/ui/tables.js"></script>
@@ -88,6 +91,7 @@
 <script src="src/ui/calculator.js"></script>
 <script src="src/ui/stat.js"></script>
 <script src="src/ui/table.js"></script>
+<script src="src/ui/basen.js"></script>
 <script src="src/ui/render.js"></script>
 <script src="src/ui/app.js"></script>
 <!-- lessons: lessons-data.js = file:// copy of src/tutorial/lessons.json (node tests/ui/lessons.check.js --write) -->

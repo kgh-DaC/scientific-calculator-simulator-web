@@ -84,6 +84,12 @@ html, body { margin: 0; background: #e9e7e2; font-family: "Segoe UI", "Malgun Go
 .lcd-in .frac { font-size: .9em; }
 .lcd-out .frac > .fn, .lcd-out .frac > .fd, .lcd-in .frac > .fn, .lcd-in .frac > .fd { line-height: 1; }
 .lcd-out .frac .frac { font-size: .85em; }
+/* BASE-N: number base label (Dec Hex Bin Oct) at the top right of the input line; the input line ends before it */
+.lcd-base { position: absolute; right: 6px; top: 16px; font: 700 12px/1 Arial, "Segoe UI", sans-serif; }
+.lcd-base:empty { display: none; }
+.lcd-basen .lcd-in { right: 34px; }
+.lcd-in .rdx { font-size: .7em; vertical-align: .35em; }
+.lcd-in .bop { padding: 0 .08em; }
 .lcd-text { position: absolute; left: 6px; right: 6px; top: 16px; bottom: 4px; font-size: 17px; line-height: 24px; white-space: pre; overflow: hidden; }
 .lcd-text:empty { display: none; }
 .lcd-scroll-l, .lcd-scroll-r { position: absolute; top: 33px; font-size: 11px; color: var(--ink); visibility: hidden; }
@@ -172,6 +178,7 @@ sub.ps, sub.e10 { font-size: .6em; vertical-align: -.25em; }
 .lg-s { color: #f0c52b; }
 .lg-a { color: #ef4b45; }
 .lg-c { color: #8fa3ff; }   /* CMPLX-mode legend (ENG = i) */
+.lg-b { color: #8fa3ff; }   /* BASE-N legend (DEC HEX BIN OCT), same colour group as the CMPLX legend */
 .leg sup, .leg sub { font-size: 7px; line-height: 0; }
 .leg .bx { width: 6px; height: 7px; }
 

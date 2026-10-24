@@ -416,6 +416,7 @@
       if (prev === 'SHIFT' && key.sh) sub = plain(key.sh);
       else if (prev === 'ALPHA' && key.al) sub = plain(key.al);
       else if (prev !== 'SHIFT' && prev !== 'ALPHA' && mode === 'CMPLX' && key.cxAct && key.cx) sub = plain(key.cx);
+      else if (prev !== 'SHIFT' && prev !== 'ALPHA' && mode === 'BASE-N' && key.bnSub) sub = key.bnSub;   // DEC HEX BIN OCT, A~F
     }
     return '<span class="lk ' + cls + '">' + esc(k) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>';
   }

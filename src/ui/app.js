@@ -12,13 +12,14 @@
   var FX = G.FX;
   var doc = G.document;
   // program version: the only place it is defined (shown at the top right of the calculator body)
-  FX.VERSION = 'v1.3';
+  FX.VERSION = 'v1.4';
 
   /* ---------------- keypad ---------------- */
   function legendHTML(k) {
     var s = k.sh ? '<span class="lg-s">' + k.sh + '</span>' : '';
     var a = k.al ? '<span class="lg-a">' + k.al + '</span>' : '';
     if (k.cx) a += '<span class="lg-c">' + k.cx + '</span>';   // CMPLX-mode legend (ENG: i)
+    if (k.bn) a += '<span class="lg-b">' + k.bn + '</span>';   // BASE-N legend (x² DEC, x^ HEX, log BIN, ln OCT)
     return '<div class="leg' + (s && a ? ' both' : '') + '">' + s + a + '</div>';
   }
 

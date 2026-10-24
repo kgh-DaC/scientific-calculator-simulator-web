@@ -5,38 +5,44 @@
       "id": "C1", "title": "기초: 계산기와 친해지기",
       "units": [
         { "id": "C1-U1", "title": "처음 만나기", "slides": "4~7" },
-        { "id": "C1-U2", "title": "식 입력과 고치기", "slides": "13~15" },
-        { "id": "C1-U3", "title": "값 저장하기", "slides": "16~17" },
-        { "id": "C1-U4", "title": "분수 계산", "slides": "11, 18" }
+        { "id": "C1-U2", "title": "식 입력과 고치기", "slides": "8~12" },
+        { "id": "C1-U3", "title": "값 저장하기", "slides": "13~15" },
+        { "id": "C1-U4", "title": "분수 계산", "slides": "16~18" }
       ]
     },
     {
       "id": "C2", "title": "활용: 측정 실습에서 쓰는 계산",
       "units": [
-        { "id": "C2-U1", "title": "루트·π·각도", "slides": "7~8, 22" },
-        { "id": "C2-U2", "title": "측정값 표시 정리", "slides": "9~10, 12" },
-        { "id": "C2-U3", "title": "비율과 공차", "slides": "21" },
-        { "id": "C2-U4", "title": "긴 식 입력", "slides": "19~20" }
+        { "id": "C2-U1", "title": "루트·π·각도", "slides": "19~22" },
+        { "id": "C2-U2", "title": "측정값 표시 정리", "slides": "23~26" },
+        { "id": "C2-U3", "title": "비율과 공차", "slides": "27" },
+        { "id": "C2-U4", "title": "긴 식 입력", "slides": "28~29" }
       ]
     },
     {
       "id": "C3", "title": "공학 계산: 미적분·복소수·방정식",
       "units": [
-        { "id": "C3-U1", "title": "미적분과 합", "slides": "23~24" },
-        { "id": "C3-U2", "title": "복소수 (CMPLX)", "slides": "25~26" },
-        { "id": "C3-U3", "title": "방정식 (EQN)", "slides": "27~28" }
+        { "id": "C3-U1", "title": "미적분과 합", "slides": "30~31" },
+        { "id": "C3-U2", "title": "복소수 (CMPLX)", "slides": "32~36" },
+        { "id": "C3-U3", "title": "방정식 (EQN)", "slides": "37~38" }
       ]
     },
     {
       "id": "C4", "title": "통계 (STAT)",
       "units": [
-        { "id": "C4-U1", "title": "평균·표준편차와 측정불확도", "note": "레슨 7개. 앞부분(order 1~3, stat-1var-01~03)은 STAT 1-VAR 기초(데이터 입력, n·x̄, σx·sx 비교), 뒷부분(order 4~7, stat-uncert-01~04)은 A형·합성·확장불확도 계산. 실행 검증 통과(04_qa_report.md). 회귀·도수 레슨은 이 과정에 새 단원으로 추가한다." }
+        { "id": "C4-U1", "title": "평균·표준편차와 측정불확도", "slides": "40~46", "note": "레슨 7개. 앞부분(order 1~3, stat-1var-01~03)은 STAT 1-VAR 기초(데이터 입력, n·x̄, σx·sx 비교), 뒷부분(order 4~7, stat-uncert-01~04)은 A형·합성·확장불확도 계산. 실행 검증 통과(04_qa_report.md). 회귀·도수 레슨은 이 과정에 새 단원으로 추가한다." }
       ]
     },
     {
       "id": "C5", "title": "수표 (TABLE)",
       "units": [
-        { "id": "C5-U1", "title": "함수 값 표 만들기", "note": "레슨 4개(table-fx-01 f(X) 입력과 표 만들기, table-range-01 범위·간격 바꾸기와 ▲▼◀▶·아랫줄 값, table-peak-01 최고점·0이 되는 점 찾기, table-error-01 Insufficient MEM·Step 0·AC 복귀). 실행 검증 통과(04_qa_report.md). BASE-N, MATRIX, VECTOR 등은 새 과정으로 추가한다." }
+        { "id": "C5-U1", "title": "함수 값 표 만들기", "slides": "47~50", "note": "레슨 4개(table-fx-01 f(X) 입력과 표 만들기, table-range-01 범위·간격 바꾸기와 ▲▼◀▶·아랫줄 값, table-peak-01 최고점·0이 되는 점 찾기, table-error-01 Insufficient MEM·Step 0·AC 복귀). 실행 검증 통과(04_qa_report.md). BASE-N, MATRIX, VECTOR 등은 새 과정으로 추가한다." }
+      ]
+    },
+    {
+      "id": "C6", "title": "진법 계산 (BASE-N)",
+      "units": [
+        { "id": "C6-U1", "title": "진법 바꾸기와 논리 연산", "slides": "51~56", "note": "레슨 6개(basen-display-01 DEC·BIN·HEX·OCT 표시 바꾸기, basen-bin-01 2진 입력과 10진 읽기, basen-hex-01 A~F 키와 16진 계산, basen-arith-01 2진 사칙연산과 나눗셈 버림, basen-logic-01 and·or·xor, basen-neg-01 2의 보수와 Neg(·Not(). 강의노트 슬라이드 51~56." }
       ]
     }
   ]

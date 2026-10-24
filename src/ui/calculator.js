@@ -18,7 +18,7 @@
   var Editor = FX.Editor;
   var Keys = FX.Keys;
 
-  var MODES = { 1: 'COMP', 2: 'CMPLX', 3: 'STAT', 5: 'EQN', 7: 'TABLE' }; // MODE menu digit -> mode (numbers kept as on the fx-570ES PLUS; 4, 6, 8 are not offered and ignored)
+  var MODES = { 1: 'COMP', 2: 'CMPLX', 3: 'STAT', 4: 'BASE-N', 5: 'EQN', 7: 'TABLE' }; // MODE menu digit -> mode (numbers kept as on the fx-570ES PLUS; 6 MATRIX, 8 VECTOR are not offered and ignored)
   var HYP_FNS = ['sinh(', 'cosh(', 'tanh(', 'sinh⁻¹(', 'cosh⁻¹(', 'tanh⁻¹('];
   var CMPLX_MENU_ATOMS = ['arg(', 'Conjg(', '▶r∠θ', '▶a+bi'];
   var HISTORY_BYTES = 200;
@@ -27,7 +27,8 @@
   var ANS_PREFIX_ATOMS = { '+': 1, '−': 1, '×': 1, '÷': 1, '²': 1, '³': 1, '⁻¹': 1, '!': 1, '%': 1,
     'nPr': 1, 'nCr': 1, 'drgD': 1, 'drgR': 1, 'drgG': 1, '^(': 1, 'ˣ√(': 1, '⌟': 1,
     '∠': 1, '▶r∠θ': 1, '▶a+bi': 1,
-    'sp:xhat': 1, 'sp:xhat1': 1, 'sp:xhat2': 1, 'sp:yhat': 1, 'sp:tnorm': 1 };   // STAT estimate commands   // CMPLX: binary ∠ and the result-format commands also take Ans
+    'sp:xhat': 1, 'sp:xhat1': 1, 'sp:xhat2': 1, 'sp:yhat': 1, 'sp:tnorm': 1,
+    'and': 1, 'or': 1, 'xor': 1, 'xnor': 1 };   // BASE-N logical operators (SHIFT 3 1~4) [가정: like + − × ÷]   // STAT estimate commands   // CMPLX: binary ∠ and the result-format commands also take Ans
   var ANS_PREFIX_TPL = { pow: 1, frac: 1, nroot: 1 };
 
   function defaultSettings() {
@@ -48,7 +49,7 @@
     this.listeners = [];
     this.memory = null;
     this.settings = defaultSettings();
-    this._statIoBack = null;    // display format before MODE 3 (restored when leaving STAT)
+    this._statIoBack = null;    // display format before MODE 3 / MODE 4 (restored when leaving STAT / BASE-N)
     this.reset(true);
   }
 
@@ -77,7 +78,11 @@
     this.eqn = null;            // EQN (MODE 5) session, see "EQN" section below
     this.stat = null;           // STAT (MODE 3) session, see src/ui/stat.js
     this.table = null;          // TABLE (MODE 7) session, see src/ui/table.js
+    this.basen = null;          // BASE-N (MODE 4) session {radix}, see src/ui/basen.js
   };
+
+  // BASE-N session present (the BASE-N methods _base* live in src/ui/basen.js)
+  Calculator.prototype._inBase = function () { return this.settings.mode === 'BASE-N' && !!this.basen; };
 
   /* ---------------- events ---------------- */
   Calculator.prototype.onChange = function (fn) { this.listeners.push(fn); };
@@ -133,7 +138,8 @@
       historyLength: this.history.length,
       eqn: this.screen === 'eqn' || (this.screen === 'error' && this.eqn) ? this._eqnState() : null,
       stat: this.settings.mode === 'STAT' && this.stat ? this._statState() : null,
-      table: this.settings.mode === 'TABLE' && this.table ? this._tableState() : null
+      table: this.settings.mode === 'TABLE' && this.table ? this._tableState() : null,
+      basen: this._inBase() ? this._baseState() : null
     };
   };
 
@@ -186,6 +192,7 @@
   };
   function atomText(id) {
     if (ATOM_TEXT[id] !== undefined) return ATOM_TEXT[id];
+    if (/^(hx|rdx):/.test(id)) return id.slice(id.indexOf(':') + 1);   // BASE-N hex digit A~F, prefix d h b o
     if (id.indexOf('const:') === 0) return FX.Tables ? FX.Tables.constSymbol(id.slice(6)) : id;
     if (id.indexOf('conv:') === 0) return FX.Tables ? FX.Tables.convLabel(id.slice(5)) : id;
     if (id.indexOf('lbl:') === 0) return id.slice(4);
@@ -269,7 +276,9 @@
     if (mod === 'shift') a = act[1] || act[0];
     else if (mod === 'alpha') a = act[2] || act[0];
     else if (mod === 'shiftAlpha') a = act[2] || act[1] || act[0];
-    else a = (calcMode === 'CMPLX' && key.cxAct) ? key.cxAct : act[0];   // CMPLX: ENG -> i
+    else if (calcMode === 'CMPLX' && key.cxAct) a = key.cxAct;            // CMPLX: ENG -> i
+    else if (calcMode === 'BASE-N' && key.bnAct) a = key.bnAct;           // BASE-N: DEC HEX BIN OCT, A~F
+    else a = act[0];
     // 'cx:<action>' exists only in CMPLX mode (SHIFT (−) = ∠, SHIFT 2 = CMPLX menu); elsewhere no-op
     if (a && a.indexOf('cx:') === 0) a = calcMode === 'CMPLX' ? a.slice(3) : null;
     return a;
@@ -377,6 +386,7 @@
     var mem = this.memory;
     var settings = this.settings;
     var tableFx = this.table ? this.table.fx : null;   // f(X) kept over OFF/ON [미확인]
+    var radix = this.basen ? this.basen.radix : null;  // number base kept over OFF/ON [미확인]
     this.reset(false);
     this.memory = mem;
     this.settings = settings;
@@ -385,6 +395,7 @@
     if (settings.mode === 'EQN') this._eqnEnter();
     if (settings.mode === 'STAT') this._statEnter(null);
     if (settings.mode === 'TABLE') this._tableEnter(tableFx);
+    if (settings.mode === 'BASE-N') this._baseEnter(radix);
   };
 
   Calculator.prototype.powerOff = function () {
@@ -411,6 +422,7 @@
   Calculator.prototype._editKey = function (name, action) {
     if (!action) return;
     var inResult = this.screen === 'result';
+    if (this._inBase() && this._baseKey(name, action, inResult)) return;   // BASE-N key filter (src/ui/basen.js)
 
     // ---- insertion ----
     if (action.indexOf('a:') === 0 || action.indexOf('t:') === 0 || action.indexOf('v:') === 0) {
@@ -569,6 +581,9 @@
     this.lastExpr = h.expr;
     this.shownExpr = h.shown || h.expr;
     this.res = cloneRes(h.res);
+    // BASE-N: the entry's result text is in the base it was calculated in; show that base again so the label,
+    // the expression and the result agree (and = recalculates the same value) [미확인]
+    if (this._inBase() && this.res && this.res.radix) this.basen.radix = this.res.radix;
     this.dispFlag = false;
     this.multi = null;
   };
@@ -597,7 +612,7 @@
     if (comp.error) return { ok: false, error: comp.error, errorPos: null, srcMap: comp.srcMap };
     var memUse = memOverride || this.memory;
     if (this.settings.mode === 'STAT' && this.stat) memUse.stat = this._statAnalysis();
-    var r = A.run(comp.tokens, this.engineSettings(extra), memUse);
+    var r = this._inBase() ? this._baseRun(comp.tokens, memUse) : A.run(comp.tokens, this.engineSettings(extra), memUse);
     r.srcMap = comp.srcMap;
     r.tokens = comp.tokens;
     return r;
@@ -645,6 +660,7 @@
     this.memory.Ans = r.value;
     this._applyAssign(r);
     this.res = makeRes(r, decimal);
+    if (this._inBase()) this.res.radix = this.basen.radix;   // BASE-N: base the expression was evaluated in (history recall)
     this.screen = 'result';
     this.shownExpr = m.expr;
     this.histIdx = -1;
@@ -877,7 +893,7 @@
     }
     var A = FX.Adapter;
     if (mode === 'rcl') {
-      var r = A.run([A.varToken(v)], this.engineSettings(), this.memory);
+      var r = this._inBase() ? this._baseRun([A.varToken(v)]) : A.run([A.varToken(v)], this.engineSettings(), this.memory);
       if (!r.ok) { this._showError(r, [Editor.atom(v)], 0); return; }
       this.memory.Ans = r.value;
       this.lastExpr = [Editor.atom(v)];
@@ -904,7 +920,8 @@
 
   /* ---------------- menus ---------------- */
   var MENUS = {
-    mode: { pages: [['1:COMP', '2:CMPLX', '3:STAT', '5:EQN', '7:TABLE']] },   // one page (3 lines); 4/6/8 removed
+    mode: { pages: [['1:COMP', '2:CMPLX', '3:STAT', '4:BASE-N', '5:EQN', '7:TABLE']] },   // one page (3 lines); 6/8 not offered
+    base: { pages: [['1:and', '2:or', '3:xor', '4:xnor', '5:Not', '6:Neg'], ['1:d', '2:h', '3:b', '4:o']] },   // SHIFT 3 (BASE-N, manual 54~55쪽)
     setup: { pages: [
       ['1:MthIO', '2:LineIO', '3:Deg', '4:Rad', '5:Gra', '6:Fix', '7:Sci', '8:Norm'],
       ['1:ab/c', '2:d/c', '3:CMPLX', '4:STAT', '5:Disp', '6:◀CONT▶']
@@ -976,6 +993,7 @@
     if (name === '▼' && m.page < m.pages - 1) { m.page++; return; }
     if (name === '▲' && m.page > 0) { m.page--; return; }
     if (m.id.indexOf('stm:') === 0) { this._statMenuKey(name, action, d); return; }
+    if (m.id === 'base') { this._baseMenuKey(d); return; }
 
     var s = this.settings;
     switch (m.id) {
@@ -984,19 +1002,23 @@
           var mode = MODES[d];
           // mode change clears the calculation history; Ans, variables and M are kept
           var wasEqn = s.mode === 'EQN', wasStat = s.mode === 'STAT';
+          var LIN = { STAT: 1, 'BASE-N': 1 };
+          var wasLin = !!LIN[s.mode], prevMode = s.mode;
           s.mode = mode;
           this.history = []; this.histIdx = -1;
           this.lastExpr = null; this.shownExpr = null;
-          // STAT forces linear display (manual 12쪽 주의: "STAT, BASE-N, MATRIX 또는 VECTOR 모드를 입력할 때마다
-          // 계산기가 리니어 표기를 자동으로 변환"). Restoring the previous display format when leaving STAT is
-          // not stated in the manual [미확인]; the previous format is restored (simplest choice).
-          if (mode === 'STAT' && !wasStat) {
-            this._statIoBack = s.io;
-            this._setIO('LineIO');
-          } else if (mode !== 'STAT' && wasStat) {
+          // STAT and BASE-N force linear display (manual 12쪽 주의: "STAT, BASE-N, MATRIX 또는 VECTOR 모드를 입력할
+          // 때마다 계산기가 리니어 표기를 자동으로 변환"). Every MODE 3 / MODE 4 selection sets LineIO. Restoring the
+          // previous display format when leaving them is not stated in the manual [미확인]; the format before the
+          // first of them is restored (simplest choice).
+          if (LIN[mode]) {
+            if (!wasLin) this._statIoBack = s.io;
+            if (prevMode !== mode) this._setIO('LineIO');   // MODE 3 again inside STAT keeps the format (as before)
+          } else if (wasLin) {
             if (this._statIoBack) this._setIO(this._statIoBack);
             this._statIoBack = null;
           }
+          if (mode !== 'BASE-N') this.basen = null;
           if (mode === 'EQN') {
             // MODE 5: equation type menu (also from inside EQN = change of type, spec Part A)
             this.menu = null;
@@ -1025,6 +1047,15 @@
             this.eqn = null;
             this.stat = null;
             this._tableEnter(null);
+            return;
+          }
+          if (mode === 'BASE-N') {
+            // MODE 4: input screen, number base Dec (manual 53쪽), also MODE 4 again inside BASE-N [미확인]
+            this.eqn = null;
+            this.table = null;
+            this.stat = null;
+            this._closeMenu(true);
+            this._baseEnter(null);
             return;
           }
           this.eqn = null;
@@ -1099,6 +1130,7 @@
             this.eqn = null;            // Reset Setup returns to COMP
             this.stat = null;
             this.table = null;
+            this.basen = null;
             this.settings = defaultSettings();
             this.settings.contrast = c;
             this._statIoBack = null;
@@ -1706,6 +1738,7 @@
       lines: this.screenLines()
     };
     if (!this.power) return sc;
+    if (this._inBase()) this._baseScreen(sc);   // number base label (Dec Hex Bin Oct), 0 on the input screen
     if (this.screen === 'input') {
       sc.expr = this.ed.root;
       sc.cursor = { path: this.ed.cur.path, pos: this.ed.cur.pos, style: this.ed.cursorStyle() };

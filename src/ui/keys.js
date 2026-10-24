@@ -9,6 +9,10 @@
  *   'cx:<action>'  action available only in CMPLX mode (ignored elsewhere)
  * cxAct: replaces the base action (no SHIFT/ALPHA) in CMPLX mode (ENG -> i)
  * cx:    CMPLX-mode legend drawn on the key face area (blue)
+ * bnAct: replaces the base action (no SHIFT/ALPHA) in BASE-N mode (manual 53~54쪽):
+ *        x² = DEC, x^ = HEX, log = BIN, ln = OCT ('base:<R>'), (−) °′″ hyp sin cos tan = hex digits A~F
+ * bn:    BASE-N legend drawn on the key face area (DEC HEX BIN OCT, same colour as the CMPLX legend)
+ * bnSub: label of the BASE-N function, for the lesson key chips (DEC ... OCT, A ... F)
  */
 (function (G) {
   'use strict';
@@ -34,17 +38,17 @@
     // ---- R3 ----
     { name: 'a b/c', cap: FRAC_ICON, sh: MIXED_ICON, cls: 'k-fn', r: 3, c: 1, act: ['t:frac', 't:mixed'] },
     { name: '√', cap: '√' + BOXF, sh: '<sup>3</sup>√' + BOXF, cls: 'k-fn', r: 3, c: 2, act: ['t:sqrt', 't:cbrt'] },
-    { name: 'x²', cap: '<i class="xv">x</i><sup>2</sup>', sh: '<i class="xv">x</i><sup>3</sup>', cls: 'k-fn', r: 3, c: 3, act: ['a:²', 'a:³'] },
-    { name: 'x^', cap: '<i class="xv">x</i><sup>' + BOXF + '</sup>', sh: '<sup>' + BOXF + '</sup>√' + BOX, cls: 'k-fn', r: 3, c: 4, act: ['t:pow', 't:nroot'] },
-    { name: 'log', cap: 'log', sh: '10<sup>' + BOXF + '</sup>', cls: 'k-fn', r: 3, c: 5, act: ['a:log(', 't:pow10'] },
-    { name: 'ln', cap: 'ln', sh: '<i>e</i><sup>' + BOXF + '</sup>', cls: 'k-fn', r: 3, c: 6, act: ['a:ln(', 't:powe'] },
+    { name: 'x²', cap: '<i class="xv">x</i><sup>2</sup>', sh: '<i class="xv">x</i><sup>3</sup>', bn: 'DEC', cls: 'k-fn', r: 3, c: 3, act: ['a:²', 'a:³'], bnAct: 'base:DEC', bnSub: 'DEC' },
+    { name: 'x^', cap: '<i class="xv">x</i><sup>' + BOXF + '</sup>', sh: '<sup>' + BOXF + '</sup>√' + BOX, bn: 'HEX', cls: 'k-fn', r: 3, c: 4, act: ['t:pow', 't:nroot'], bnAct: 'base:HEX', bnSub: 'HEX' },
+    { name: 'log', cap: 'log', sh: '10<sup>' + BOXF + '</sup>', bn: 'BIN', cls: 'k-fn', r: 3, c: 5, act: ['a:log(', 't:pow10'], bnAct: 'base:BIN', bnSub: 'BIN' },
+    { name: 'ln', cap: 'ln', sh: '<i>e</i><sup>' + BOXF + '</sup>', bn: 'OCT', cls: 'k-fn', r: 3, c: 6, act: ['a:ln(', 't:powe'], bnAct: 'base:OCT', bnSub: 'OCT' },
     // ---- R4 ----
-    { name: '(−)', cap: '(−)', sh: '∠', al: 'A', cls: 'k-fn', r: 4, c: 1, act: ['a:neg', 'cx:a:∠', 'v:A'] },
-    { name: '°′″', cap: '°′″', al: 'B', cls: 'k-fn', r: 4, c: 2, act: ['dms', null, 'v:B'] },
-    { name: 'hyp', cap: 'hyp', sh: 'Abs', al: 'C', cls: 'k-fn', r: 4, c: 3, act: ['hyp', 't:abs', 'v:C'] },
-    { name: 'sin', cap: 'sin', sh: 'sin<sup>−1</sup>', al: 'D', cls: 'k-fn', r: 4, c: 4, act: ['a:sin(', 'a:sin⁻¹(', 'v:D'] },
-    { name: 'cos', cap: 'cos', sh: 'cos<sup>−1</sup>', al: 'E', cls: 'k-fn', r: 4, c: 5, act: ['a:cos(', 'a:cos⁻¹(', 'v:E'] },
-    { name: 'tan', cap: 'tan', sh: 'tan<sup>−1</sup>', al: 'F', cls: 'k-fn', r: 4, c: 6, act: ['a:tan(', 'a:tan⁻¹(', 'v:F'] },
+    { name: '(−)', cap: '(−)', sh: '∠', al: 'A', cls: 'k-fn', r: 4, c: 1, act: ['a:neg', 'cx:a:∠', 'v:A'], bnAct: 'a:hx:A', bnSub: 'A' },
+    { name: '°′″', cap: '°′″', al: 'B', cls: 'k-fn', r: 4, c: 2, act: ['dms', null, 'v:B'], bnAct: 'a:hx:B', bnSub: 'B' },
+    { name: 'hyp', cap: 'hyp', sh: 'Abs', al: 'C', cls: 'k-fn', r: 4, c: 3, act: ['hyp', 't:abs', 'v:C'], bnAct: 'a:hx:C', bnSub: 'C' },
+    { name: 'sin', cap: 'sin', sh: 'sin<sup>−1</sup>', al: 'D', cls: 'k-fn', r: 4, c: 4, act: ['a:sin(', 'a:sin⁻¹(', 'v:D'], bnAct: 'a:hx:D', bnSub: 'D' },
+    { name: 'cos', cap: 'cos', sh: 'cos<sup>−1</sup>', al: 'E', cls: 'k-fn', r: 4, c: 5, act: ['a:cos(', 'a:cos⁻¹(', 'v:E'], bnAct: 'a:hx:E', bnSub: 'E' },
+    { name: 'tan', cap: 'tan', sh: 'tan<sup>−1</sup>', al: 'F', cls: 'k-fn', r: 4, c: 6, act: ['a:tan(', 'a:tan⁻¹(', 'v:F'], bnAct: 'a:hx:F', bnSub: 'F' },
     // ---- R5 ----
     { name: 'RCL', cap: 'RCL', sh: 'STO', cls: 'k-fn', r: 5, c: 1, act: ['rcl', 'sto'] },
     { name: 'ENG', cap: 'ENG', sh: '←', cx: '<i>i</i>', cls: 'k-fn', r: 5, c: 2, act: ['eng', 'engL', null], cxAct: 'a:i' },

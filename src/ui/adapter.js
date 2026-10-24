@@ -27,6 +27,7 @@
   // CMPLX result-format commands (SHIFT 2 3/4), allowed only at the end of an expression (engine checks)
   var CMDS = { '▶r∠θ': 'polar', '▶a+bi': 'rect' };
   var POSTFIX = { '²': 'sq', '³': 'cube', '⁻¹': 'inv', '!': 'fact', '%': 'pct', 'drgD': 'deg', 'drgR': 'rad', 'drgG': 'grad' };
+  var BASE_OPS = { 'and': 1, 'or': 1, 'xor': 1, 'xnor': 1 };
   var TPL_NAME = { frac: 'frac', mixed: 'mixed', sqrt: 'sqrt', cbrt: 'cbrt', nroot: 'root', pow: 'pow', pow10: 'pow10',
     powe: 'exp', logb: 'logb', abs: 'abs', integ: 'integ', deriv: 'diff', sum: 'sum' };
 
@@ -61,6 +62,10 @@
     if (id.indexOf('st:') === 0) return { type: 'stat', name: id.slice(3) };                    // STAT values (SHIFT 1 menus)
     if (id.indexOf('sp:') === 0) return { type: 'statpost', name: id.slice(3) };                // x-hat y-hat x-hat1 x-hat2 and the t command
     if (id.indexOf('sf:') === 0) return { type: 'fn', name: id.slice(3).replace('(', '') };     // P( Q( R(
+    if (id.indexOf('hx:') === 0) return { type: 'num', value: id.slice(3) };                    // BASE-N hex digit A~F
+    if (id.indexOf('rdx:') === 0) return { type: 'radix', value: id.slice(4) };                 // BASE-N prefix d h b o
+    if (BASE_OPS[id]) return { type: 'op', value: id };                                          // BASE-N and or xor xnor
+    if (id === 'Not(' || id === 'Neg(') return { type: 'fn', name: id === 'Not(' ? 'not' : 'neg' };
     return null; // display-only atoms ('→A', 'M+', 'lbl:...')
   }
 
@@ -381,7 +386,34 @@
     return { start: v(d.start), end: v(d.end), step: v(d.step) };
   }
 
+  /* ---------------- BASE-N (MODE 4) ---------------- */
+  // Contract: src/engine/basen.js (CalcEngine.evaluateBase / baseConvert / baseZero), _workspace/02_engine_changes.md.
+  // settings.base = 'DEC'|'HEX'|'BIN'|'OCT'. Results: {ok, value, n, base, indicator, text, display, error, errorPos}
+  // with display/text already in the fixed-width form of the base. Without the engine: missing:true.
+  function baseMissing(name) { var E = engine(); return !E || typeof E[name] !== 'function'; }
+  function baseRun(tokens, settings, mem) {
+    if (baseMissing('evaluateBase')) return { ok: false, error: 'No Engine', errorPos: null, missing: true };
+    var s = {};
+    for (var k in settings) if (OPT_KEYS.indexOf(k) < 0) s[k] = settings[k];
+    try { return normalizeResult(engine().evaluateBase(tokens, s, toEngineMemory(mem || freshMemory()))); }
+    catch (e) { return { ok: false, error: (e && (e.calcError || e.kind)) || 'Math ERROR', errorPos: null }; }
+  }
+  function baseConvert(value, base) {
+    if (baseMissing('baseConvert')) return { ok: false, error: 'No Engine', errorPos: null, missing: true };
+    try { return normalizeResult(engine().baseConvert(value, base)); }
+    catch (e) { return { ok: false, error: (e && (e.calcError || e.kind)) || 'Math ERROR', errorPos: null }; }
+  }
+  // 0 of a base as shown on the result line ('0', '00000000', '0000000000000000', '00000000000'); null without engine
+  function baseZero(base) {
+    if (baseMissing('baseZero')) return null;
+    try { return engine().baseZero(base); } catch (e) { return null; }
+  }
+
   FX.Adapter = {
+    baseRun: baseRun,
+    baseConvert: baseConvert,
+    baseZero: baseZero,
+    hasBase: function () { return !baseMissing('evaluateBase'); },
     tableCheck: tableCheck,
     tableParam: tableParam,
     tableGenerate: tableGenerate,
